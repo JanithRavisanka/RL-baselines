@@ -3,6 +3,7 @@ from collections import deque
 from pathlib import Path
 import sys
 import os
+import datetime
 
 if "DISPLAY" not in os.environ:
     os.environ.setdefault("MUJOCO_GL", "egl")
@@ -16,6 +17,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import imageio
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from dreamer_common import (
@@ -135,6 +138,7 @@ def train(args):
     actor_opt = optim.Adam(model.actor.parameters(), lr=cfg.actor_lr)
     value_opt = optim.Adam(model.value.parameters(), lr=cfg.value_lr)
     replay = ReplayBuffer()
+    world_losses, actor_losses, value_losses = [], [], []
 
     obs, _ = env.reset()
     obs = to_pixel_observation(env, obs)
@@ -205,12 +209,74 @@ def train(args):
         value_loss.backward()
         nn.utils.clip_grad_norm_(model.value.parameters(), 100.0)
         value_opt.step()
+        world_losses.append(float(world_loss.item()))
+        actor_losses.append(float(actor_loss.item()))
+        value_losses.append(float(value_loss.item()))
 
         if update % 100 == 0:
             print(
                 f"Update {update}/{args.updates} | world {world_loss.item():.4f} "
                 f"| actor {actor_loss.item():.4f} | value {value_loss.item():.4f}"
             )
+    env.close()
+    return model, {
+        "world_loss": world_losses,
+        "actor_loss": actor_losses,
+        "value_loss": value_losses,
+    }
+
+
+def plot_metrics(metrics, save_dir):
+    plt.figure(figsize=(10, 5))
+    plt.plot(metrics["world_loss"], label="world_loss")
+    plt.plot(metrics["actor_loss"], label="actor_loss")
+    plt.plot(metrics["value_loss"], label="value_loss")
+    plt.xlabel("Update")
+    plt.ylabel("Loss")
+    plt.title("Dreamer V1 Training Losses")
+    plt.legend()
+    plt.grid()
+    out = os.path.join(save_dir, "training_curve.png")
+    plt.savefig(out)
+    print(f"Training curve saved: {out}")
+
+
+def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
+    env = gym.make(env_name, render_mode="rgb_array")
+    obs, _ = env.reset()
+    obs = to_pixel_observation(env, obs)
+    state = model.rssm.init_state(batch=1, device=dev)
+    prev_action = torch.zeros(1, env.action_space.shape[0], device=dev)
+    frames = []
+    total_reward = 0.0
+    done = False
+    steps = 0
+
+    with torch.no_grad():
+        while not done and steps < max_steps:
+            frame = env.render()
+            if frame is not None:
+                frames.append(frame)
+            obs_t = torch.tensor(obs, dtype=torch.uint8, device=dev).unsqueeze(0)
+            embed = model.encoder(obs_t)
+            post, _ = model.rssm.observe_step(state, prev_action, embed)
+            feat = model.feat(post)
+            dist = model.actor_dist(feat)
+            action = torch.clamp(dist.mean, -1.0, 1.0)
+            nxt, rew, term, trunc, _ = env.step(action.squeeze(0).cpu().numpy())
+            done = term or trunc
+            total_reward += rew
+            obs = to_pixel_observation(env, nxt if not done else env.reset()[0])
+            state = post
+            prev_action = action
+            steps += 1
+
+    env.close()
+    gif_path = os.path.join(save_dir, "dreamer_v1_agent.gif")
+    if frames:
+        imageio.mimsave(gif_path, frames, fps=30)
+        print(f"Evaluation GIF saved: {gif_path}")
+    print(f"Evaluation reward: {total_reward:.2f}")
 
 
 def build_args():
@@ -222,4 +288,17 @@ def build_args():
 
 
 if __name__ == "__main__":
-    train(build_args())
+    args = build_args()
+    dev = device()
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    save_dir = os.path.join(base_dir, "results", "dreamer_v1", f"run_{timestamp}")
+    os.makedirs(save_dir, exist_ok=True)
+    print(f"Saving all outputs to: {save_dir}")
+
+    model, metrics = train(args)
+    model_path = os.path.join(save_dir, "model.pth")
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved: {model_path}")
+    plot_metrics(metrics, save_dir)
+    evaluate_and_record(model, args.env, save_dir, dev)

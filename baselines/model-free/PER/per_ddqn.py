@@ -8,6 +8,7 @@ import torch.optim as optim
 import numpy as np
 import random
 import imageio
+import matplotlib.pyplot as plt
 import os
 import datetime
 from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
@@ -288,7 +289,26 @@ def train():
             print(f"Frame: {frame_idx}/{max_frames} | Epsilon: {epsilon:.2f} | Avg Reward (Last 20): {avg_reward:.2f}")
 
     env.close()
-    return q_network
+    return q_network, episode_rewards
+
+
+def plot_rewards(rewards, save_dir):
+    plt.figure(figsize=(10, 5))
+    plt.plot(rewards, alpha=0.6)
+    plt.title('PER DDQN Training on Breakout-v5')
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+
+    window = 20
+    if len(rewards) >= window:
+        moving_avg = np.convolve(rewards, np.ones(window) / window, mode='valid')
+        plt.plot(range(window - 1, len(rewards)), moving_avg, color='red', label='Moving Average (20 episodes)')
+        plt.legend()
+
+    plt.grid()
+    save_path = os.path.join(save_dir, 'training_curve.png')
+    plt.savefig(save_path)
+    print(f"Training curve saved as '{save_path}'")
 
 def evaluate_and_record(model, save_dir):
     filename = os.path.join(save_dir, 'breakout_per_ddqn_agent.gif')
@@ -326,10 +346,11 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    model = train()
+    model, rewards = train()
     
     model_path = os.path.join(save_dir, "model.pth")
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
-    
+
+    plot_rewards(rewards, save_dir)
     evaluate_and_record(model, save_dir)

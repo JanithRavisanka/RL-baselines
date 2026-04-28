@@ -2,6 +2,8 @@ import argparse
 from collections import deque
 from pathlib import Path
 import sys
+import os
+import datetime
 
 import gymnasium as gym
 import ale_py
@@ -11,6 +13,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
+import imageio
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from dreamer_common import ConvDecoder, ConvEncoder, DiscreteRSSM, MLPHead, lambda_return, symlog
@@ -86,7 +90,7 @@ class DreamerV3(nn.Module):
 
 
 def preprocess_frame(frame):
-    frame = np.asarray(frame)
+    frame = np.ascontiguousarray(np.asarray(frame))
     if frame.ndim == 2:
         frame = np.repeat(frame[..., None], 3, axis=-1)
     frame = torch.tensor(frame).permute(2, 0, 1).unsqueeze(0).float()
@@ -106,6 +110,7 @@ def train(args):
     actor_opt = optim.Adam(model.actor.parameters(), lr=3e-5, eps=1e-5)
     value_opt = optim.Adam(model.value.parameters(), lr=3e-5, eps=1e-5)
     replay = ReplayBuffer()
+    world_losses, actor_losses, value_losses = [], [], []
 
     obs, _ = env.reset()
     obs = preprocess_frame(obs)
@@ -182,12 +187,81 @@ def train(args):
         value_loss.backward()
         nn.utils.clip_grad_norm_(model.value.parameters(), 100.0)
         value_opt.step()
+        world_losses.append(float(world_loss.item()))
+        actor_losses.append(float(actor_loss.item()))
+        value_losses.append(float(value_loss.item()))
 
         if update % 100 == 0:
             print(
                 f"Update {update}/{args.updates} | world {world_loss.item():.4f} "
                 f"| actor {actor_loss.item():.4f} | value {value_loss.item():.4f}"
             )
+    env.close()
+    return model, {
+        "world_loss": world_losses,
+        "actor_loss": actor_losses,
+        "value_loss": value_losses,
+    }
+
+
+def plot_metrics(metrics, save_dir):
+    plt.figure(figsize=(10, 5))
+    plt.plot(metrics["world_loss"], label="world_loss")
+    plt.plot(metrics["actor_loss"], label="actor_loss")
+    plt.plot(metrics["value_loss"], label="value_loss")
+    plt.xlabel("Update")
+    plt.ylabel("Loss")
+    plt.title("Dreamer V3 Training Losses")
+    plt.legend()
+    plt.grid()
+    out = os.path.join(save_dir, "training_curve.png")
+    plt.savefig(out)
+    print(f"Training curve saved: {out}")
+
+
+def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
+    env = gym.make(env_name, render_mode="rgb_array")
+    obs, _ = env.reset()
+    obs = preprocess_frame(obs)
+    state = model.rssm.init_state(batch=1, device=dev)
+    prev_action = torch.zeros(1, env.action_space.n, device=dev)
+    frames = []
+    total_reward = 0.0
+    done = False
+    steps = 0
+
+    # FIRE to start Breakout.
+    obs, rew, term, trunc, _ = env.step(1)
+    total_reward += rew
+    done = term or trunc
+    obs = preprocess_frame(obs if not done else env.reset()[0])
+    prev_action = F.one_hot(torch.tensor([1], device=dev), env.action_space.n).float()
+
+    with torch.no_grad():
+        while not done and steps < max_steps:
+            frame = env.render()
+            if frame is not None:
+                frames.append(frame)
+            obs_t = torch.tensor(obs, dtype=torch.uint8, device=dev).unsqueeze(0)
+            embed = model.encoder(obs_t)
+            post, _ = model.rssm.observe_step(state, prev_action, embed)
+            feat = model.feat(post)
+            logits = model.actor(feat)
+            action = torch.argmax(logits, dim=-1)
+            nxt, rew, term, trunc, _ = env.step(int(action.item()))
+            done = term or trunc
+            total_reward += rew
+            obs = preprocess_frame(nxt if not done else env.reset()[0])
+            state = post
+            prev_action = F.one_hot(action, env.action_space.n).float()
+            steps += 1
+
+    env.close()
+    gif_path = os.path.join(save_dir, "dreamer_v3_agent.gif")
+    if frames:
+        imageio.mimsave(gif_path, frames, fps=30)
+        print(f"Evaluation GIF saved: {gif_path}")
+    print(f"Evaluation reward: {total_reward:.2f}")
 
 
 def build_args():
@@ -201,4 +275,17 @@ def build_args():
 
 
 if __name__ == "__main__":
-    train(build_args())
+    args = build_args()
+    dev = device()
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    save_dir = os.path.join(base_dir, "results", "dreamer_v3", f"run_{timestamp}")
+    os.makedirs(save_dir, exist_ok=True)
+    print(f"Saving all outputs to: {save_dir}")
+
+    model, metrics = train(args)
+    model_path = os.path.join(save_dir, "model.pth")
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved: {model_path}")
+    plot_metrics(metrics, save_dir)
+    evaluate_and_record(model, args.env, save_dir, dev)
