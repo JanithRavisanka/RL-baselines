@@ -93,3 +93,45 @@ Typical outputs:
 - model checkpoint (`.pth` or `.npy`)
 - training curve (`.png`)
 - evaluation rollout (`.gif`)
+
+## Play Trained Models
+
+Use the unified playback CLI from repo root:
+
+```bash
+python play_model.py --algo <algorithm_key>
+```
+
+Supported `--algo` values:
+
+- `actor_critic`
+- `actor_critic_continuous`
+- `dqn`
+- `ddqn`
+- `per_ddqn`
+- `dyna_q`
+- `mpc`
+- `muzero`
+
+### Common examples
+
+- Auto-pick latest available checkpoint for DDQN:
+```bash
+python play_model.py --algo ddqn --episodes 1
+```
+
+- Use an explicit checkpoint path:
+```bash
+python play_model.py --algo dqn --model-path results/dqn/run_20260428_081628/model.pth
+```
+
+- Save a GIF rollout:
+```bash
+python play_model.py --algo actor_critic --save-gif results/actor_critic_eval.gif
+```
+
+### Notes
+
+- If `--model-path` is omitted, the script searches `results/<algo_folder>/run_*` and picks the latest run containing the expected model file.
+- Dyna-Q playback expects a Q-table file (`q_table.npy`).
+- `--device` can be `auto`, `cpu`, or `cuda` (default: `auto`).

@@ -71,13 +71,13 @@ class DynaQAgent:
             self.q_table[sim_state][sim_action] += self.alpha * sim_td_error
 
 def train():
-    env = gym.make('CliffWalking-v0')
+    env = gym.make('CliffWalking-v1')
     state_dim = env.observation_space.n
     action_dim = env.action_space.n
 
     agent = DynaQAgent(state_dim, action_dim, alpha=0.1, gamma=0.99, epsilon=0.1, planning_steps=50)
     
-    num_episodes = 500
+    num_episodes = 50000 
     episode_rewards = []
     
     print(f"Starting Dyna-Q Training on CliffWalking-v0 for {num_episodes} episodes...")
@@ -135,7 +135,7 @@ def evaluate_and_record(agent, save_dir):
     
     # CliffWalking does not have rgb_array render mode natively without some tricks in older gym versions,
     # but in Gymnasium it does!
-    env = gym.make('CliffWalking-v0', render_mode='rgb_array')
+    env = gym.make('CliffWalking', render_mode='rgb_array')
     state, _ = env.reset()
     frames = []
     
