@@ -80,6 +80,33 @@ python baselines/model-based/MPC/learned_dynamics_mpc.py
 python baselines/model-based/MuZero/muzero.py
 ```
 
+- Dreamer V1 (paper-style continuous RSSM):
+```bash
+python baselines/model-based/Dreamer-v1/dreamer_v1.py --env dm_control/walker-walk-v0
+```
+
+- Dreamer V2 (paper-style discrete RSSM):
+```bash
+python baselines/model-based/Dreamer-v2/dreamer_v2.py --env ALE/Breakout-v5
+```
+
+- Dreamer V3 (paper-style world model + continuation head):
+```bash
+python baselines/model-based/Dreamer-v3/dreamer_v3.py --env ALE/Breakout-v5
+```
+
+### Dreamer Dependencies (paper-standard targets)
+
+- For DeepMind Control experiments (Dreamer V1/V2):
+```bash
+python -m pip install "gymnasium[all]" dm-control shimmy
+```
+
+- For Atari experiments (Dreamer V2/V3):
+```bash
+python -m pip install "gymnasium[atari]" ale-py
+```
+
 ## Outputs
 
 Each script writes outputs under:

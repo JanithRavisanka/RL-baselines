@@ -1,6 +1,8 @@
 torch
 gymnasium
 ale-py
+shimmy
+dm-control
 numpy
 matplotlib
 imageio
