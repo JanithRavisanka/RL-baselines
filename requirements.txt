@@ -1,0 +1,6 @@
+torch
+gymnasium
+ale-py
+numpy
+matplotlib
+imageio
