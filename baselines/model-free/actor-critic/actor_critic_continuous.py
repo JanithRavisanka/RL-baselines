@@ -57,6 +57,14 @@ class ActorCriticContinuous(nn.Module):
         return mu, sigma, state_value
 
 def train():
+    """
+    Episodic actor-critic for continuous control.
+
+    Policy parameterization:
+    - Actor outputs (mu, sigma) for a Gaussian policy over actions.
+    - Action is sampled during training for exploration, then clipped to env bounds.
+    - Critic estimates V(s) and serves as baseline in advantage computation.
+    """
     # Pendulum-v1 is a continuous environment
     env = gym.make('Pendulum-v1')
     
@@ -88,13 +96,16 @@ def train():
             # Get Gaussian parameters and state value
             mu, sigma, state_value = model(state_tensor)
             
-            # Create a Normal distribution from mu and sigma
+            # Create a Normal distribution from mu and sigma.
+            # log_prob under this distribution is the score-function term used for
+            # policy-gradient updates.
             dist = Normal(mu, sigma)
             
-            # Sample an action (this handles exploration)
+            # Sample action for stochastic exploration.
+            # In continuous spaces this is the main exploration mechanism.
             action = dist.sample()
             
-            # Clip the action to the environment's allowed limits [-2.0, 2.0]
+            # Clip to valid action range expected by physics simulator.
             action_clipped = torch.clamp(action, -max_action, max_action)
             
             # Take step in environment
@@ -111,6 +122,9 @@ def train():
         episode_rewards.append(sum(rewards))
         
         # --- LEARNING ---
+        # We compute Monte-Carlo returns, then use:
+        # - actor loss:   -log pi(a|s) * advantage
+        # - critic loss:  regression to return target
         returns = []
         R = 0
         for r in rewards[::-1]:
@@ -124,6 +138,7 @@ def train():
         critic_loss = []
         
         for log_prob, value, R in zip(log_probs, values, returns):
+            # Advantage estimate A_t ~= G_t - V(s_t)
             advantage = R - value.item()
             
             actor_loss.append(-log_prob * advantage)
@@ -133,7 +148,8 @@ def train():
         loss = torch.stack(actor_loss).sum() + torch.stack(critic_loss).sum()
         loss.backward()
         
-        # Gradient clipping prevents the model from diverging due to massive updates
+        # Gradient clipping is especially useful here because log-prob terms can spike
+        # when sigma becomes very small and create unstable updates.
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         

@@ -157,30 +157,32 @@ def run_mctx(config, network, obs):
         
     root.hidden_state = hidden_state
     
-    # Expand root
+    # Expand root from policy priors predicted by f(h(o)).
+    # Children are created lazily once with prior probabilities.
     policy_probs = F.softmax(policy_logits, dim=1).cpu().numpy()[0]
     for a in range(config['action_dim']):
         root.children[a] = Node(policy_probs[a])
         
-    # Add Dirichlet noise to root for exploration
+    # Add Dirichlet noise only at root to diversify self-play trajectories.
     noise = np.random.dirichlet([config['dirichlet_alpha']] * config['action_dim'])
     for a in root.children:
         root.children[a].prior = root.children[a].prior * (1 - config['dirichlet_eps']) + noise[a] * config['dirichlet_eps']
         
-    # 2. Run Simulations
+    # 2. Run simulations:
+    # selection (PUCT) -> expansion (dynamics step) -> backup (discounted return)
     min_max_stats = MinMaxStats()
     for _ in range(config['num_simulations']):
         node = root
         search_path = [node]
         history = [] # actions taken
         
-        # Traverse
+        # Selection phase: descend tree by highest UCB score.
         while node.expanded():
             action, node = select_child(config, node, min_max_stats)
             history.append(action)
             search_path.append(node)
             
-        # Expand and Evaluate Leaf
+        # Expansion/evaluation: one recurrent model step from parent hidden state.
         parent = search_path[-2]
         action = history[-1]
         action_tensor = torch.tensor([action], dtype=torch.long, device=device)
@@ -196,7 +198,8 @@ def run_mctx(config, network, obs):
         for a in range(config['action_dim']):
             node.children[a] = Node(policy_probs[a])
             
-        # Backpropagate
+        # Backup value through search path:
+        # parent value = reward + discount * child value
         for node in reversed(search_path):
             node.value_sum += v
             node.visit_count += 1
@@ -241,50 +244,61 @@ class ReplayBuffer:
     def sample(self, batch_size, unroll_steps, config):
         # We sample an observation, and then sequences of length `unroll_steps`
         obs_batch, action_batch, reward_batch, policy_batch, value_batch = [], [], [], [], []
-        
+        reward_mask_batch, policy_mask_batch = [], []
+
         for _ in range(batch_size):
             game = self.buffer[np.random.randint(len(self.buffer))]
             start = np.random.randint(len(game.observations))
             obs_batch.append(game.observations[start])
-            
-            actions = []
-            rewards = []
-            policies = []
-            values = []
-            
+
+            actions, rewards, reward_mask = [], [], []
+            policies, values, policy_mask = [], [], []
+
             for i in range(unroll_steps):
-                if start + i < len(game.observations):
-                    actions.append(game.actions[start + i])
-                    rewards.append(game.rewards[start + i])
+                idx = start + i
+                if idx < len(game.observations):
+                    actions.append(game.actions[idx])
+                    rewards.append(game.rewards[idx])
+                    reward_mask.append(1.0)
                 else:
-                    # Absorbing state (game ended)
+                    # Absorbing/padding state — kept for tensor shape consistency
+                    # but excluded from losses by masks.
                     actions.append(np.random.randint(config["action_dim"]))
                     rewards.append(0.0)
+                    reward_mask.append(0.0)
 
             for i in range(unroll_steps + 1):
                 idx = start + i
                 if idx < len(game.observations):
                     policies.append(game.target_policies[idx])
                     values.append(make_value_target(game, idx, config))
+                    policy_mask.append(1.0)
                 else:
                     policies.append(np.ones(config["action_dim"]) / config["action_dim"])
                     values.append(0.0)
-                    
+                    policy_mask.append(0.0)
+
             action_batch.append(actions)
             reward_batch.append(rewards)
+            reward_mask_batch.append(reward_mask)
             policy_batch.append(policies)
             value_batch.append(values)
-            
+            policy_mask_batch.append(policy_mask)
+
         return (
             torch.FloatTensor(np.array(obs_batch)).to(device),
             torch.LongTensor(np.array(action_batch)).to(device),
             torch.FloatTensor(np.array(reward_batch)).to(device),
             torch.FloatTensor(np.array(policy_batch)).to(device),
-            torch.FloatTensor(np.array(value_batch)).to(device)
+            torch.FloatTensor(np.array(value_batch)).to(device),
+            torch.FloatTensor(np.array(reward_mask_batch)).to(device),
+            torch.FloatTensor(np.array(policy_mask_batch)).to(device),
         )
 
 
 def make_value_target(game, start, config):
+    # n-step bootstrap target:
+    # sum_{i=0..n-1} gamma^i r_{t+i} + gamma^n v_{t+n}
     value = 0.0
     discount = 1.0
     bootstrap_index = start + config["td_steps"]
@@ -298,6 +312,14 @@ def make_value_target(game, start, config):
 # ==============================================================================
 # 4. Training Loop (BPTT)
 # ==============================================================================
+
+def temperature_schedule(episode):
+    if episode < 50:
+        return 1.0
+    if episode < 100:
+        return 0.5
+    return 0.25
+
 
 def train():
     env = gym.make("CartPole-v1")
@@ -313,8 +335,9 @@ def train():
         'td_steps': 5,
         'unroll_steps': 5, # Unroll K steps during BPTT training
         'batch_size': 64,
-        'num_games': 200,
-        'lr': 0.002
+        'num_games': 2000,
+        'lr': 0.002,
+        'temperature_fn': temperature_schedule,
     }
     
     network = MuZeroNetwork(config['obs_dim'], config['action_dim']).to(device)
@@ -328,58 +351,83 @@ def train():
         obs, _ = env.reset()
         done = False
         total_reward = 0
-        
+        step = 0
+
         while not done:
-            # 1. Plan using MCTS
             policy, root_value = run_mctx(config, network, obs)
-            
-            # 2. Select Action (Explore based on MCTS visit counts)
-            action = np.random.choice(config['action_dim'], p=policy)
-            
-            # 3. Take real environment step
+
+            # Visit-count temperature schedule (paper: hot for exploration, cool later).
+            temperature = config['temperature_fn'](episode)
+            if temperature == 0:
+                action = int(np.argmax(policy))
+            else:
+                logits = np.log(policy + 1e-9) / temperature
+                exp_logits = np.exp(logits - logits.max())
+                sampling_probs = exp_logits / exp_logits.sum()
+                action = int(np.random.choice(config['action_dim'], p=sampling_probs))
+
             next_obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
-            
+
             game.store_search_statistics(obs, action, reward, policy, root_value)
             obs = next_obs
-            
+            step += 1
+
         buffer.save_game(game)
         episode_rewards.append(total_reward)
-        
+
         # --- Unrolled BPTT Training ---
         if len(buffer.buffer) > 10:
-            for _ in range(2): # Optimize multiple times per game added
-                obs_batch, act_batch, rew_batch, pol_batch, val_batch = buffer.sample(config['batch_size'], config['unroll_steps'], config)
-                
-                loss = 0
-                
-                # Initial Step: h(o) -> s_0
+            for _ in range(2):
+                (
+                    obs_batch,
+                    act_batch,
+                    rew_batch,
+                    pol_batch,
+                    val_batch,
+                    rew_mask,
+                    pol_mask,
+                ) = buffer.sample(config['batch_size'], config['unroll_steps'], config)
+
+                loss = 0.0
+
+                # Initial step: h(o) -> s_0
                 hidden_state, policy_logits, value = network.initial_inference(obs_batch)
-                
-                # Step 0 Loss
-                target_value = val_batch[:, 0].unsqueeze(1)
-                target_policy = pol_batch[:, 0]
-                
-                loss += F.mse_loss(value, target_value)
-                loss += -torch.sum(target_policy * F.log_softmax(policy_logits, dim=1), dim=1).mean()
-                
-                # Unroll for K steps
+
+                target_value0 = val_batch[:, 0].unsqueeze(1)
+                target_policy0 = pol_batch[:, 0]
+                policy_w0 = pol_mask[:, 0].unsqueeze(1)
+
+                value_loss0 = ((value - target_value0) ** 2 * policy_w0).sum() / policy_w0.sum().clamp_min(1.0)
+                policy_loss0 = -(target_policy0 * F.log_softmax(policy_logits, dim=1)).sum(-1, keepdim=True)
+                policy_loss0 = (policy_loss0 * policy_w0).sum() / policy_w0.sum().clamp_min(1.0)
+                loss = loss + value_loss0 + policy_loss0
+
+                # Unroll recurrent dynamics for K steps and accumulate masked losses.
                 for k in range(config['unroll_steps']):
                     action = act_batch[:, k]
-                    
-                    # g(s_{k-1}, a_k) -> r_k, s_k
                     hidden_state, reward, policy_logits, value = network.recurrent_inference(hidden_state, action)
-                    
+
+                    rw = rew_mask[:, k].unsqueeze(1)
+                    pw = pol_mask[:, k + 1].unsqueeze(1)
+
                     target_reward = rew_batch[:, k].unsqueeze(1)
                     target_value = val_batch[:, k + 1].unsqueeze(1)
                     target_policy = pol_batch[:, k + 1]
-                    
-                    # Scale losses by 1/K
-                    loss += (1.0 / config['unroll_steps']) * F.mse_loss(reward, target_reward)
-                    loss += (1.0 / config['unroll_steps']) * F.mse_loss(value, target_value)
-                    loss += (1.0 / config['unroll_steps']) * -torch.sum(target_policy * F.log_softmax(policy_logits, dim=1), dim=1).mean()
-                
+
+                    reward_loss = ((reward - target_reward) ** 2 * rw).sum() / rw.sum().clamp_min(1.0)
+                    value_loss = ((value - target_value) ** 2 * pw).sum() / pw.sum().clamp_min(1.0)
+                    policy_loss = -(target_policy * F.log_softmax(policy_logits, dim=1)).sum(-1, keepdim=True)
+                    policy_loss = (policy_loss * pw).sum() / pw.sum().clamp_min(1.0)
+
+                    scale = 1.0 / config['unroll_steps']
+                    loss = loss + scale * (reward_loss + value_loss + policy_loss)
+
+                    # Scale gradients to recurrent hidden state path (MuZero Appendix G)
+                    # to stabilize very deep unroll updates.
+                    hidden_state.register_hook(lambda grad: grad * 0.5)
+
                 optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(network.parameters(), max_norm=5.0)

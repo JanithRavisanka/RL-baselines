@@ -39,6 +39,14 @@ class ActorCritic(nn.Module):
         return action_probs, state_value
 
 def train():
+    """
+    Monte-Carlo episodic Actor-Critic training loop.
+
+    Why this structure:
+    - We collect one full episode before updating so returns are unbiased samples.
+    - The critic learns a baseline V(s) to reduce policy-gradient variance.
+    - The actor is updated with advantage-weighted log-prob terms.
+    """
     # Initialize the CartPole environment
     env = gym.make('CartPole-v1')
     
@@ -104,8 +112,9 @@ def train():
             
         returns = torch.tensor(returns)
         
-        # Normalize returns (subtract mean, divide by standard deviation)
-        # This makes training much more stable by keeping values within a standard scale
+        # Normalize returns (subtract mean, divide by std).
+        # This does NOT change trajectory ordering; it rescales gradient magnitudes so
+        # optimization remains stable across early/late training phases.
         returns = (returns - returns.mean()) / (returns.std() + 1e-7)
         
         actor_loss = []
@@ -113,7 +122,9 @@ def train():
         
         # 2. Calculate Losses for both the Actor and the Critic
         for log_prob, value, R in zip(log_probs, values, returns):
-            # Advantage = Actual Return - Critic's Predicted Value
+            # Advantage estimate:
+            #   A_t ~= G_t - V(s_t)
+            # where G_t is Monte-Carlo return and V(s_t) is critic baseline.
             # If Advantage > 0: The action resulted in a better outcome than the critic expected.
             # If Advantage < 0: The action resulted in a worse outcome than the critic expected.
             advantage = R - value.item()
@@ -126,7 +137,11 @@ def train():
             # We use Smooth L1 Loss (Huber Loss) which is less sensitive to outliers than Mean Squared Error
             critic_loss.append(F.smooth_l1_loss(value, torch.tensor([[R]])))
             
-        # 3. Backpropagation (Update the neural network weights)
+        # 3. Backpropagation (joint actor+critic update)
+        # We optimize a single scalar objective that is the sum of:
+        # - policy gradient surrogate (actor),
+        # - value regression loss (critic).
+        # Shared trunk gradients therefore reflect both objectives.
         optimizer.zero_grad() # Clear old gradients
         # Combine actor and critic losses into a single total loss
         loss = torch.stack(actor_loss).sum() + torch.stack(critic_loss).sum()

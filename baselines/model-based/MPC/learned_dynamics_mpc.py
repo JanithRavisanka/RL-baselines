@@ -72,6 +72,8 @@ class TransitionNormalizer:
         self.delta_std = torch.ones(state_dim, device=device)
 
     def update(self, buffer):
+        # Fit running dataset statistics from replay.
+        # Normalized inputs/targets make dynamics optimization better conditioned.
         states, actions, next_states = map(np.stack, zip(*buffer.buffer))
         states_t = torch.FloatTensor(states).to(device)
         actions_t = torch.FloatTensor(actions).to(device)
@@ -114,7 +116,7 @@ class CEMPlanner:
     """
     Cross-entropy method MPC with an ensemble dynamics model.
     """
-    def __init__(self, dynamics_models, normalizer, action_dim, action_low, action_high, num_sequences=512, horizon=20, elite_frac=0.1, iterations=4):
+    def __init__(self, dynamics_models, normalizer, action_dim, action_low, action_high, num_sequences=512, horizon=20, elite_frac=0.1, iterations=4, gamma=0.99):
         self.models = dynamics_models
         self.normalizer = normalizer
         self.action_dim = action_dim
@@ -124,8 +126,10 @@ class CEMPlanner:
         self.H = horizon       # How many steps into the future to simulate
         self.elite_frac = elite_frac
         self.iterations = iterations
+        self.gamma = gamma
 
     def predict_delta(self, states, actions):
+        # Ensemble mean prediction reduces single-model exploitation artifacts.
         norm_states, norm_actions = self.normalizer.inputs(states, actions)
         preds = []
         for model in self.models:
@@ -133,16 +137,21 @@ class CEMPlanner:
         return torch.stack(preds, dim=0).mean(0)
 
     def rollout_return(self, current_state, action_sequences):
-        state_batch = torch.FloatTensor(current_state).unsqueeze(0).repeat(self.K, 1).to(device)
-        cumulative_rewards = torch.zeros(self.K).to(device)
+        # Evaluate every candidate open-loop sequence under learned dynamics.
+        # We apply geometric discount to emphasize near-term controllability.
+        K = action_sequences.shape[1]
+        state_batch = torch.FloatTensor(current_state).unsqueeze(0).repeat(K, 1).to(device)
+        cumulative_rewards = torch.zeros(K).to(device)
+        discount = 1.0
         for t in range(self.H):
             actions_t = action_sequences[t]
             next_state_batch = state_batch + self.predict_delta(state_batch, actions_t)
             norm = torch.sqrt(next_state_batch[:, 0]**2 + next_state_batch[:, 1]**2 + 1e-8)
             next_state_batch[:, 0] /= norm
             next_state_batch[:, 1] /= norm
-            cumulative_rewards += pendulum_reward_fn(next_state_batch, actions_t)
+            cumulative_rewards += discount * pendulum_reward_fn(next_state_batch, actions_t)
             state_batch = next_state_batch
+            discount *= self.gamma
         return cumulative_rewards
 
     def get_action(self, current_state):
@@ -153,6 +162,10 @@ class CEMPlanner:
             std = torch.ones_like(mean) * (self.action_high - self.action_low) / 2.0
             elite_count = max(1, int(self.K * self.elite_frac))
             best_sequence = None
+            # CEM loop:
+            # 1) sample candidates from current Gaussian over action sequences,
+            # 2) keep elite fraction,
+            # 3) refit Gaussian to elites.
             for _ in range(self.iterations):
                 noise = torch.randn(self.H, self.K, self.action_dim, device=device)
                 action_sequences = mean[:, None, :] + std[:, None, :] * noise
@@ -183,6 +196,9 @@ def train_dynamics_model(models, optimizers, normalizer, buffer, batch_size=256,
         next_states_t = torch.FloatTensor(next_states).to(device)
         true_deltas = next_states_t - states_t
 
+        # Train in normalized delta-space:
+        # model predicts standardized (s_{t+1} - s_t), then denormalization is only
+        # needed for rollout/planning time.
         norm_states, norm_actions = normalizer.inputs(states_t, actions_t)
         target_deltas = normalizer.deltas(true_deltas)
         loss = 0.0
@@ -199,10 +215,16 @@ def train_dynamics_model(models, optimizers, normalizer, buffer, batch_size=256,
     return total_loss / epochs
 
 
+def predict_delta_ensemble(models, normalizer, states, actions):
+    norm_states, norm_actions = normalizer.inputs(states, actions)
+    preds = [normalizer.denorm_delta(model(norm_states, norm_actions)) for model in models]
+    return torch.stack(preds, dim=0).mean(0)
+
+
 def validate_multistep(models, normalizer, buffer, horizon=5, samples=256):
+    # Multi-step validation catches compounding rollout error that one-step MSE misses.
     if len(buffer) < horizon + 1:
         return 0.0
-    planner = CEMPlanner(models, normalizer, action_dim=1, action_low=[-2.0], action_high=[2.0], num_sequences=1, horizon=horizon)
     errors = []
     max_start = max(0, len(buffer.buffer) - horizon)
     for _ in range(min(samples, max_start)):
@@ -212,7 +234,7 @@ def validate_multistep(models, normalizer, buffer, horizon=5, samples=256):
             pred = state.clone()
             for t in range(horizon):
                 action = torch.FloatTensor(buffer.buffer[start + t][1]).unsqueeze(0).to(device)
-                pred = pred + planner.predict_delta(pred, action)
+                pred = pred + predict_delta_ensemble(models, normalizer, pred, action)
             actual = torch.FloatTensor(buffer.buffer[start + horizon - 1][2]).unsqueeze(0).to(device)
             errors.append(F.mse_loss(pred, actual).item())
     return float(np.mean(errors)) if errors else 0.0

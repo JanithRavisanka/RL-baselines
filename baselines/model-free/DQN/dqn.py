@@ -102,6 +102,14 @@ def make_env(env_name="ALE/Breakout-v5", render_mode=None):
     return env
 
 def train():
+    """
+    Classic DQN training loop for Atari with replay + target network.
+
+    Key stability ingredients:
+    - Experience replay breaks temporal correlations in online Atari streams.
+    - A lagged target network prevents chasing a moving bootstrap target.
+    - Reward clipping standardizes scale across sparse/dense reward regimes.
+    """
     env = make_env()
     action_dim = env.action_space.n
     
@@ -186,18 +194,21 @@ def train():
             rewards_tensor = torch.FloatTensor(rewards_b).unsqueeze(1).to(device)
             dones_tensor = torch.BoolTensor(dones_b).unsqueeze(1).to(device)
             
-            # Current Q-Values: What does the main network think the action we took was worth?
+            # Current Q(s_t, a_t) from online network.
+            # gather() indexes predicted Q-values at executed actions.
             current_q_values = q_network(states_tensor).gather(1, actions_tensor)
             
             # Target Q-Values: What does the TARGET network think the best next action is worth?
             with torch.no_grad():
                 max_next_q_values = target_network(next_states_tensor).max(dim=1, keepdim=True)[0]
                 
-                # Bellman Equation: Target = Reward + Gamma * Max Next Q
+                # 1-step Bellman bootstrap target:
+                #   y_t = r_t + gamma * max_a' Q_target(s_{t+1}, a')
                 # If done, there is no next Q value!
                 target_q_values = rewards_tensor + (gamma * max_next_q_values * (~dones_tensor))
                 
-            # Compute Loss (Huber Loss / Smooth L1)
+            # Huber loss is less sensitive to large TD errors than MSE and is the
+            # common default in Atari DQN implementations.
             loss = F.smooth_l1_loss(current_q_values, target_q_values)
             
             # Backpropagation

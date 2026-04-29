@@ -102,6 +102,14 @@ def make_env(env_name="ALE/Breakout-v5", render_mode=None):
     return env
 
 def train():
+    """
+    Double DQN training loop.
+
+    Difference from vanilla DQN:
+    - Online net selects argmax action at next state.
+    - Target net evaluates that selected action value.
+    This decoupling reduces positive overestimation bias.
+    """
     env = make_env()
     action_dim = env.action_space.n
     
@@ -191,10 +199,12 @@ def train():
             
             # --- DOUBLE DQN TARGET CALCULATION ---
             with torch.no_grad():
-                # 1. Main Network chooses the BEST action for the next state
+                # 1) Action selection with online network:
+                #    a* = argmax_a Q_online(s', a)
                 best_next_actions = q_network(next_states_tensor).argmax(dim=1, keepdim=True)
                 
-                # 2. Target Network evaluates the Q-value of that SPECIFIC chosen action
+                # 2) Action evaluation with target network:
+                #    Q_target(s', a*)
                 max_next_q_values = target_network(next_states_tensor).gather(1, best_next_actions)
                 
                 # Bellman Equation: Target = Reward + Gamma * Max Next Q

@@ -81,6 +81,7 @@ class SumTree:
         return self.tree[0]
 
     def add(self, p, data):
+        # Leaf index corresponding to current ring-buffer write pointer.
         idx = self.write + self.capacity - 1
         self.data[self.write] = data
         self.update(idx, p)
@@ -127,6 +128,8 @@ class PrioritizedReplayBuffer:
             self.size += 1
 
     def sample(self, batch_size, beta=0.4):
+        # Stratified sampling over equal-priority mass segments.
+        # This reduces variance versus drawing all samples from one interval.
         batch = []
         idxs = []
         priorities = []
@@ -143,7 +146,9 @@ class PrioritizedReplayBuffer:
             batch.append(data)
             idxs.append(idx)
 
-        # Importance Sampling (IS) weights calculations
+        # Importance Sampling correction:
+        # High-priority samples are intentionally over-sampled, so we reweight loss
+        # by (1 / (N * P(i)))^beta to reduce introduced bias.
         sampling_probabilities = np.array(priorities) / self.tree.total()
         is_weight = np.power(self.size * sampling_probabilities, -beta)
         # Normalize weights so the maximum weight is 1.0
@@ -176,6 +181,14 @@ def make_env(env_name="ALE/Breakout-v5", render_mode=None):
     return env
 
 def train():
+    """
+    PER + Double DQN.
+
+    Composition rationale:
+    - Double DQN mitigates target overestimation.
+    - PER focuses updates on transitions with higher TD error signal.
+    - IS weights keep training approximately unbiased as beta -> 1.
+    """
     env = make_env()
     action_dim = env.action_space.n
     
@@ -263,8 +276,8 @@ def train():
                 max_next_q_values = target_network(next_states_tensor).gather(1, best_next_actions)
                 target_q_values = rewards_tensor + (gamma * max_next_q_values * (~dones_tensor))
                 
-            # Compute TD Errors for Priority Update
-            # Absolute difference between target and current Q values
+            # TD error magnitude is the proxy for "learning progress potential".
+            # Larger TD error => transition likely carries more corrective signal.
             td_errors = (target_q_values - current_q_values).abs().detach().cpu().numpy()
             
             # Update the SumTree with the new priorities
