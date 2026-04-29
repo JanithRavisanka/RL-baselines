@@ -1,0 +1,19 @@
+Saving all results to: /home/administrator/baselines/results/actor_critic/run_20260428_203455
+Starting Actor-Critic training...
+Episode 50/1000 | Average Reward (last 50): 36.68
+Episode 100/1000 | Average Reward (last 50): 135.88
+Episode 150/1000 | Average Reward (last 50): 240.38
+Episode 200/1000 | Average Reward (last 50): 301.66
+Episode 250/1000 | Average Reward (last 50): 375.30
+Episode 300/1000 | Average Reward (last 50): 285.60
+Episode 350/1000 | Average Reward (last 50): 156.74
+Episode 400/1000 | Average Reward (last 50): 295.96
+Episode 450/1000 | Average Reward (last 50): 500.00
+Solved at episode 476!
+Model saved to /home/administrator/baselines/results/actor_critic/run_20260428_203455/model.pth
+Plotting learning curve...
+Training curve saved as '/home/administrator/baselines/results/actor_critic/run_20260428_203455/training_curve.png'
+Evaluating trained agent and recording video...
+Evaluation finished. Total Reward: 500.0
+Saving video as /home/administrator/baselines/results/actor_critic/run_20260428_203455/cartpole_agent.gif...
+Saved successfully!

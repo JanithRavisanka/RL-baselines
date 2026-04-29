@@ -1,0 +1,56 @@
+A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138)
+[Powered by Stella]
+Saving all outputs to: /home/administrator/baselines/results/dreamer_v2/run_20260429_013729
+Prefill: 1000/20000
+Prefill: 2000/20000
+Prefill: 3000/20000
+Prefill: 4000/20000
+Prefill: 5000/20000
+Prefill: 6000/20000
+Prefill: 7000/20000
+Prefill: 8000/20000
+Prefill: 9000/20000
+Prefill: 10000/20000
+Prefill: 11000/20000
+Prefill: 12000/20000
+Prefill: 13000/20000
+Prefill: 14000/20000
+Prefill: 15000/20000
+Prefill: 16000/20000
+Prefill: 17000/20000
+Prefill: 18000/20000
+Prefill: 19000/20000
+Update 0/3000 | world 1.1790 | actor 0.0645 | value 0.0326
+Update 100/3000 | world 1.0202 | actor 0.0136 | value 0.0973
+Update 200/3000 | world 1.0173 | actor 0.0889 | value 0.1181
+Update 300/3000 | world 1.0081 | actor -0.0211 | value 0.0931
+Update 400/3000 | world 1.0112 | actor 0.0984 | value 0.0849
+Update 500/3000 | world 1.0097 | actor -0.0341 | value 0.1580
+Update 600/3000 | world 1.0122 | actor 0.1272 | value 0.0957
+Update 700/3000 | world 1.0084 | actor -0.0012 | value 0.0802
+Update 800/3000 | world 1.0084 | actor 0.0064 | value 0.0929
+Update 900/3000 | world 1.0060 | actor -0.0036 | value 0.0551
+Update 1000/3000 | world 1.0060 | actor -0.0001 | value 0.1041
+Update 1100/3000 | world 1.0096 | actor 0.0000 | value 0.0805
+Update 1200/3000 | world 1.0072 | actor 0.0082 | value 0.0651
+Update 1300/3000 | world 1.0059 | actor -0.0000 | value 0.0660
+Update 1400/3000 | world 1.0085 | actor 0.0000 | value 0.0731
+Update 1500/3000 | world 1.0109 | actor -0.0005 | value 0.0996
+Update 1600/3000 | world 1.0084 | actor 0.0000 | value 0.0741
+Update 1700/3000 | world 1.0084 | actor -0.0000 | value 0.1118
+Update 1800/3000 | world 1.0022 | actor -0.0000 | value 0.0751
+Update 1900/3000 | world 1.0095 | actor 0.0000 | value 0.0770
+Update 2000/3000 | world 1.0072 | actor -0.0000 | value 0.0694
+Update 2100/3000 | world 1.0034 | actor -0.0068 | value 0.0515
+Update 2200/3000 | world 1.0095 | actor 0.0000 | value 0.0928
+Update 2300/3000 | world 1.0097 | actor 0.0000 | value 0.0762
+Update 2400/3000 | world 1.0082 | actor 0.0000 | value 0.0827
+Update 2500/3000 | world 1.0134 | actor -0.0005 | value 0.1083
+Update 2600/3000 | world 1.0059 | actor -0.0000 | value 0.0724
+Update 2700/3000 | world 1.0071 | actor 0.0084 | value 0.1075
+Update 2800/3000 | world 1.0072 | actor -0.0099 | value 0.0811
+Update 2900/3000 | world 1.0083 | actor 0.0003 | value 0.0893
+Model saved: /home/administrator/baselines/results/dreamer_v2/run_20260429_013729/model.pth
+Training curve saved: /home/administrator/baselines/results/dreamer_v2/run_20260429_013729/training_curve.png
+Evaluation GIF saved: /home/administrator/baselines/results/dreamer_v2/run_20260429_013729/dreamer_v2_agent.gif
+Evaluation reward: 1.00

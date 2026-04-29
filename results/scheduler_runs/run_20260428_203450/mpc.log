@@ -1,0 +1,60 @@
+Using device: cuda
+Saving all results to: /home/administrator/baselines/results/mpc/run_20260429_005909
+Collecting seed dataset with random actions...
+Training initial Dynamics Model...
+Starting MPC Control loop...
+Episode 1/25 | Total Reward: -686.15
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00055
+Episode 2/25 | Total Reward: -362.99
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00045
+Episode 3/25 | Total Reward: -377.03
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00050
+Episode 4/25 | Total Reward: -2.17
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00026
+Episode 5/25 | Total Reward: -123.50
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00026
+Episode 6/25 | Total Reward: -256.22
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00028
+Episode 7/25 | Total Reward: -247.56
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00019
+Episode 8/25 | Total Reward: -127.58
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00018
+Episode 9/25 | Total Reward: -129.16
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00019
+Episode 10/25 | Total Reward: -250.59
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00014
+Episode 11/25 | Total Reward: -127.07
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00019
+Episode 12/25 | Total Reward: -252.34
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00014
+Episode 13/25 | Total Reward: -0.75
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00011
+Episode 14/25 | Total Reward: -127.65
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00012
+Episode 15/25 | Total Reward: -245.47
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00015
+Episode 16/25 | Total Reward: -128.79
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00015
+Episode 17/25 | Total Reward: -1.43
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00010
+Episode 18/25 | Total Reward: -126.79
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00011
+Episode 19/25 | Total Reward: -351.05
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00009
+Episode 20/25 | Total Reward: -128.12
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00014
+Episode 21/25 | Total Reward: -124.75
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00013
+Episode 22/25 | Total Reward: -125.63
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00012
+Episode 23/25 | Total Reward: -125.47
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00010
+Episode 24/25 | Total Reward: -123.44
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00006
+Episode 25/25 | Total Reward: -126.04
+   -> Dynamics Model retrained. Avg MSE Loss: 0.00012
+Dynamics Model saved to /home/administrator/baselines/results/mpc/run_20260429_005909/dynamics_model.pth
+Training curve saved as '/home/administrator/baselines/results/mpc/run_20260429_005909/training_curve.png'
+Evaluating agent and saving video to /home/administrator/baselines/results/mpc/run_20260429_005909/pendulum_mpc_agent.gif...
+Evaluation finished. Total Reward: -372.91
+Saved successfully!

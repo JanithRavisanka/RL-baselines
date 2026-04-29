@@ -1,0 +1,31 @@
+/home/administrator/baselines/venv/lib/python3.12/site-packages/imageio/plugins/pillow.py:410: DeprecationWarning: The keyword `fps` is no longer supported. Use `duration`(in ms) instead, e.g. `fps=50` == `duration=20` (1000 * 1/50).
+  warnings.warn(
+Saving all outputs to: /home/administrator/baselines/results/dreamer_v1/run_20260429_010504
+Prefill: 1000/5000
+Prefill: 2000/5000
+Prefill: 3000/5000
+Prefill: 4000/5000
+Update 0/2000 | world 3.1034 | actor 2.1527 | value 0.1134
+Update 100/2000 | world 3.0057 | actor 0.0040 | value 0.1240
+Update 200/2000 | world 3.0078 | actor -0.3356 | value 0.3127
+Update 300/2000 | world 3.0049 | actor 0.1302 | value 0.0309
+Update 400/2000 | world 3.0095 | actor -0.0951 | value 0.4928
+Update 500/2000 | world 3.0070 | actor -0.4176 | value 0.2856
+Update 600/2000 | world 3.0050 | actor -0.2084 | value 0.1255
+Update 700/2000 | world 3.0045 | actor -0.2517 | value 0.0472
+Update 800/2000 | world 3.0042 | actor -0.0064 | value 0.0290
+Update 900/2000 | world 3.0037 | actor -0.1250 | value 0.0329
+Update 1000/2000 | world 3.0041 | actor 0.2138 | value 0.0687
+Update 1100/2000 | world 3.0066 | actor -0.1565 | value 0.2939
+Update 1200/2000 | world 3.0037 | actor -0.2478 | value 0.0445
+Update 1300/2000 | world 3.0040 | actor 0.1649 | value 0.0880
+Update 1400/2000 | world 3.0038 | actor 0.3103 | value 0.1211
+Update 1500/2000 | world 3.0035 | actor 0.2510 | value 0.0668
+Update 1600/2000 | world 3.0039 | actor -0.0617 | value 0.0672
+Update 1700/2000 | world 3.0039 | actor 0.0936 | value 0.1718
+Update 1800/2000 | world 3.0062 | actor -0.5838 | value 0.2846
+Update 1900/2000 | world 3.0033 | actor 0.2098 | value 0.0278
+Model saved: /home/administrator/baselines/results/dreamer_v1/run_20260429_010504/model.pth
+Training curve saved: /home/administrator/baselines/results/dreamer_v1/run_20260429_010504/training_curve.png
+Evaluation GIF saved: /home/administrator/baselines/results/dreamer_v1/run_20260429_010504/dreamer_v1_agent.gif
+Evaluation reward: 39.35

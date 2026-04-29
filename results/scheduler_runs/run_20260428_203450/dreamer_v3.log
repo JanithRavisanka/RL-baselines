@@ -1,0 +1,64 @@
+A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138)
+[Powered by Stella]
+Saving all outputs to: /home/administrator/baselines/results/dreamer_v3/run_20260429_023145
+Prefill: 2000/50000
+Prefill: 4000/50000
+Prefill: 6000/50000
+Prefill: 8000/50000
+Prefill: 10000/50000
+Prefill: 12000/50000
+Prefill: 14000/50000
+Prefill: 16000/50000
+Prefill: 18000/50000
+Prefill: 20000/50000
+Prefill: 22000/50000
+Prefill: 24000/50000
+Prefill: 26000/50000
+Prefill: 28000/50000
+Prefill: 30000/50000
+Prefill: 32000/50000
+Prefill: 34000/50000
+Prefill: 36000/50000
+Prefill: 38000/50000
+Prefill: 40000/50000
+Prefill: 42000/50000
+Prefill: 44000/50000
+Prefill: 46000/50000
+Prefill: 48000/50000
+Update 0/5000 | world 1.4505 | actor 0.0506 | value 0.0017
+Update 100/5000 | world 0.6404 | actor 0.0359 | value 0.0014
+Update 200/5000 | world 0.6275 | actor -0.0119 | value 0.0006
+Update 300/5000 | world 0.6387 | actor 0.0355 | value 0.0011
+Update 400/5000 | world 0.6452 | actor 0.0042 | value 0.0005
+Update 500/5000 | world 0.6488 | actor -0.0242 | value 0.0007
+Update 600/5000 | world 0.6247 | actor -0.0397 | value 0.0013
+Update 700/5000 | world 0.6499 | actor 0.0907 | value 0.0052
+Update 800/5000 | world 0.6395 | actor -0.0081 | value 0.0006
+Update 900/5000 | world 0.6394 | actor -0.0018 | value 0.0004
+Update 1000/5000 | world 0.6450 | actor 0.0473 | value 0.0019
+Update 1100/5000 | world 0.6457 | actor 0.0061 | value 0.0004
+Update 1200/5000 | world 0.6361 | actor 0.0200 | value 0.0006
+Update 1300/5000 | world 0.6319 | actor 0.0247 | value 0.0007
+Update 1400/5000 | world 0.6387 | actor 0.0925 | value 0.0054
+Update 1500/5000 | world 0.6347 | actor 0.0290 | value 0.0011
+Update 1600/5000 | world 0.6360 | actor -0.0984 | value 0.0063
+Update 1700/5000 | world 0.6388 | actor -0.0133 | value 0.0006
+Update 1800/5000 | world 0.6386 | actor 0.1036 | value 0.0065
+Update 1900/5000 | world 0.6248 | actor 0.0210 | value 0.0006
+Update 2000/5000 | world 0.6345 | actor -0.0182 | value 0.0007
+Update 2100/5000 | world 0.6525 | actor 0.0043 | value 0.0004
+Traceback (most recent call last):
+  File "/home/administrator/baselines/baselines/model-based/Dreamer-v3/dreamer_v3.py", line 286, in <module>
+    if frame is not None:
+             ^^^^^^^^^^^
+  File "/home/administrator/baselines/baselines/model-based/Dreamer-v3/dreamer_v3.py", line 163, in train
+    obs, _ = env.reset()
+        ^^^^^^^^^^^^^^^^^
+  File "/home/administrator/baselines/venv/lib/python3.12/site-packages/torch/_tensor.py", line 626, in backward
+    torch.autograd.backward(
+  File "/home/administrator/baselines/venv/lib/python3.12/site-packages/torch/autograd/__init__.py", line 347, in backward
+    _engine_run_backward(
+  File "/home/administrator/baselines/venv/lib/python3.12/site-packages/torch/autograd/graph.py", line 823, in _engine_run_backward
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

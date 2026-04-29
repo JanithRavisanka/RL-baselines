@@ -1,0 +1,27 @@
+Using device: cuda
+Saving all results to: /home/administrator/baselines/results/muzero/run_20260429_010222
+Starting MuZero training on CartPole-v1...
+Game 10/200 | Avg Reward: 22.60
+Game 20/200 | Avg Reward: 16.70
+Game 30/200 | Avg Reward: 9.60
+Game 40/200 | Avg Reward: 9.40
+Game 50/200 | Avg Reward: 9.60
+Game 60/200 | Avg Reward: 9.30
+Game 70/200 | Avg Reward: 9.60
+Game 80/200 | Avg Reward: 9.60
+Game 90/200 | Avg Reward: 9.50
+Game 100/200 | Avg Reward: 9.30
+Game 110/200 | Avg Reward: 9.30
+Game 120/200 | Avg Reward: 9.60
+Game 130/200 | Avg Reward: 9.30
+Game 140/200 | Avg Reward: 9.30
+Game 150/200 | Avg Reward: 9.10
+Game 160/200 | Avg Reward: 9.40
+Game 170/200 | Avg Reward: 9.70
+Game 180/200 | Avg Reward: 9.40
+Game 190/200 | Avg Reward: 9.20
+Game 200/200 | Avg Reward: 9.20
+Training curve saved as '/home/administrator/baselines/results/muzero/run_20260429_010222/training_curve.png'
+Evaluation finished. Total Reward: 10.0
+Saving video as /home/administrator/baselines/results/muzero/run_20260429_010222/muzero_agent.gif...
+Saved successfully!
