@@ -162,3 +162,21 @@ python play_model.py --algo actor_critic --save-gif results/actor_critic_eval.gi
 - If `--model-path` is omitted, the script searches `results/<algo_folder>/run_*` and picks the latest run containing the expected model file.
 - Dyna-Q playback expects a Q-table file (`q_table.npy`).
 - `--device` can be `auto`, `cpu`, or `cuda` (default: `auto`).
+
+## Run All Algorithms (Max 3 At Once)
+
+Use the scheduler script to automate running all training scripts with bounded concurrency.
+
+```bash
+python run_all_algorithms.py --max-parallel 3
+```
+
+Optional flags:
+
+- `--poll-seconds 5` to control completion check interval
+
+Logs are saved to:
+
+```bash
+results/scheduler_runs/run_<timestamp>/*.log
+```

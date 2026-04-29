@@ -31,6 +31,11 @@ def lambda_return(reward, value, discount, bootstrap, lam):
     return torch.stack(returns, dim=0)
 
 
+def free_nats_loss(kl: torch.Tensor, free_nats: float) -> torch.Tensor:
+    """Only penalize KL above the free-nats threshold."""
+    return torch.clamp(kl - free_nats, min=0.0).mean()
+
+
 class ConvEncoder(nn.Module):
     def __init__(self, in_channels=3, depth=48):
         super().__init__()
@@ -122,6 +127,13 @@ class ContinuousRSSM(nn.Module):
         prior = {"deter": deter, "stoch": p_mean, "mean": p_mean, "std": p_std}
         return post, prior
 
+    def imagine_step(self, prev, action):
+        x = torch.cat([prev["stoch"], action], dim=-1)
+        deter = self.gru(x, prev["deter"])
+        p_mean, p_std = self._dist(self.prior(deter))
+        stoch = p_mean + p_std * torch.randn_like(p_std)
+        return {"deter": deter, "stoch": stoch, "mean": p_mean, "std": p_std}
+
     @staticmethod
     def kl(post, prior):
         p = torch.distributions.Normal(post["mean"], post["std"])
@@ -160,10 +172,18 @@ class DiscreteRSSM(nn.Module):
         p_logits = self.prior(deter)
         q_logits = self.post(torch.cat([deter, embed], dim=-1))
         stoch, q_probs = self._sample(q_logits)
-        _, p_probs = self._sample(p_logits)
+        p_stoch, p_probs = self._sample(p_logits)
         post = {"deter": deter, "stoch": stoch, "probs": q_probs}
-        prior = {"deter": deter, "stoch": p_probs, "probs": p_probs}
+        prior = {"deter": deter, "stoch": p_stoch, "probs": p_probs}
         return post, prior
+
+    def imagine_step(self, prev, action):
+        prev_flat = prev["stoch"].flatten(start_dim=1)
+        x = torch.cat([prev_flat, action], dim=-1)
+        deter = self.gru(x, prev["deter"])
+        logits = self.prior(deter)
+        stoch, probs = self._sample(logits)
+        return {"deter": deter, "stoch": stoch, "probs": probs}
 
     @staticmethod
     def kl(post, prior):

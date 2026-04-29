@@ -21,7 +21,7 @@ class DynaQAgent:
         # Initialize Q(S,A) to zeros
         self.q_table = np.zeros((state_dim, action_dim))
 
-        # Initialize Model(S,A) -> R, S'
+        # Initialize Model(S,A) -> R, S', terminal
         # Since CliffWalking is deterministic, a simple dictionary is perfect.
         self.model = {}
         
@@ -38,10 +38,10 @@ class DynaQAgent:
             best_actions = np.argwhere(self.q_table[state] == np.amax(self.q_table[state])).flatten()
             return np.random.choice(best_actions)
 
-    def learn(self, state, action, reward, next_state):
+    def learn(self, state, action, reward, next_state, done):
         # (d) Direct RL Update
         best_next_action = np.argmax(self.q_table[next_state])
-        td_target = reward + self.gamma * self.q_table[next_state][best_next_action]
+        td_target = reward if done else reward + self.gamma * self.q_table[next_state][best_next_action]
         td_error = td_target - self.q_table[state][action]
         self.q_table[state][action] += self.alpha * td_error
 
@@ -52,7 +52,7 @@ class DynaQAgent:
         if action not in self.observed_actions[state]:
             self.observed_actions[state].append(action)
             
-        self.model[(state, action)] = (reward, next_state)
+        self.model[(state, action)] = (reward, next_state, done)
 
         # (f) Planning Loop
         for _ in range(self.planning_steps):
@@ -62,16 +62,39 @@ class DynaQAgent:
             sim_action = random.choice(self.observed_actions[sim_state])
             
             # R, S' <- Model(S,A)
-            sim_reward, sim_next_state = self.model[(sim_state, sim_action)]
+            sim_reward, sim_next_state, sim_done = self.model[(sim_state, sim_action)]
             
             # Q(S,A) <- Q(S,A) + alpha [R + gamma max Q(S',a) - Q(S,A)]
             sim_best_next_action = np.argmax(self.q_table[sim_next_state])
-            sim_td_target = sim_reward + self.gamma * self.q_table[sim_next_state][sim_best_next_action]
+            sim_td_target = sim_reward if sim_done else sim_reward + self.gamma * self.q_table[sim_next_state][sim_best_next_action]
             sim_td_error = sim_td_target - self.q_table[sim_state][sim_action]
             self.q_table[sim_state][sim_action] += self.alpha * sim_td_error
 
+
+def evaluate_policy(agent, env_name='CliffWalking-v1', episodes=5, max_steps=100):
+    env = gym.make(env_name)
+    original_epsilon = agent.epsilon
+    agent.epsilon = 0.0
+    returns = []
+    for _ in range(episodes):
+        state, _ = env.reset()
+        done = False
+        total_reward = 0
+        steps = 0
+        while not done and steps < max_steps:
+            action = agent.choose_action(state)
+            state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+            steps += 1
+        returns.append(total_reward)
+    agent.epsilon = original_epsilon
+    env.close()
+    return float(np.mean(returns))
+
 def train():
-    env = gym.make('CliffWalking-v1')
+    env_name = 'CliffWalking-v1'
+    env = gym.make(env_name)
     state_dim = env.observation_space.n
     action_dim = env.action_space.n
 
@@ -79,8 +102,9 @@ def train():
     
     num_episodes = 50000 
     episode_rewards = []
+    eval_rewards = []
     
-    print(f"Starting Dyna-Q Training on CliffWalking-v0 for {num_episodes} episodes...")
+    print(f"Starting Dyna-Q Training on {env_name} for {num_episodes} episodes...")
 
     for episode in range(num_episodes):
         # (a) S <- current state
@@ -97,7 +121,7 @@ def train():
             done = terminated or truncated
             
             # (d, e, f) Direct RL, Model Update, and Planning Loop
-            agent.learn(state, action, reward, next_state)
+            agent.learn(state, action, reward, next_state, done)
             
             state = next_state
             total_reward += reward
@@ -106,23 +130,32 @@ def train():
         
         if (episode + 1) % 50 == 0:
             avg_reward = np.mean(episode_rewards[-50:])
-            print(f"Episode {episode + 1}/{num_episodes} | Avg Reward (Last 50): {avg_reward:.2f}")
+            eval_reward = evaluate_policy(agent, env_name=env_name)
+            eval_rewards.append(eval_reward)
+            print(
+                f"Episode {episode + 1}/{num_episodes} | Exploratory train avg (Last 50): {avg_reward:.2f} "
+                f"| Greedy eval avg: {eval_reward:.2f}"
+            )
+        agent.epsilon = max(0.01, agent.epsilon * 0.99995)
 
     env.close()
-    return agent, episode_rewards
+    return agent, episode_rewards, eval_rewards
 
-def plot_rewards(rewards, save_dir):
+def plot_rewards(rewards, eval_rewards, save_dir):
     plt.figure(figsize=(10, 5))
-    plt.plot(rewards)
-    plt.title('Dyna-Q Training on CliffWalking-v0')
+    plt.plot(rewards, alpha=0.35, label='Exploratory train return')
+    plt.title('Dyna-Q Training on CliffWalking-v1')
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
     
     window = 50
     if len(rewards) >= window:
         moving_avg = np.convolve(rewards, np.ones(window)/window, mode='valid')
-        plt.plot(range(window-1, len(rewards)), moving_avg, color='red', label='Moving Average (50 episodes)')
-        plt.legend()
+        plt.plot(range(window-1, len(rewards)), moving_avg, color='red', label='Train moving average (50)')
+    if eval_rewards:
+        eval_x = np.arange(50, 50 * (len(eval_rewards) + 1), 50)
+        plt.plot(eval_x, eval_rewards, color='green', marker='o', label='Greedy eval average')
+    plt.legend()
         
     plt.grid()
     save_path = os.path.join(save_dir, 'training_curve.png')
@@ -135,7 +168,7 @@ def evaluate_and_record(agent, save_dir):
     
     # CliffWalking does not have rgb_array render mode natively without some tricks in older gym versions,
     # but in Gymnasium it does!
-    env = gym.make('CliffWalking', render_mode='rgb_array')
+    env = gym.make('CliffWalking-v1', render_mode='rgb_array')
     state, _ = env.reset()
     frames = []
     
@@ -174,11 +207,11 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    agent, rewards = train()
+    agent, rewards, eval_rewards = train()
     
     model_path = os.path.join(save_dir, "q_table.npy")
     np.save(model_path, agent.q_table)
     print(f"Q-table saved to {model_path}")
     
-    plot_rewards(rewards, save_dir)
+    plot_rewards(rewards, eval_rewards, save_dir)
     evaluate_and_record(agent, save_dir)

@@ -113,6 +113,39 @@ class Node:
             return 0
         return self.value_sum / self.visit_count
 
+
+class MinMaxStats:
+    def __init__(self):
+        self.minimum = float("inf")
+        self.maximum = -float("inf")
+
+    def update(self, value):
+        self.minimum = min(self.minimum, value)
+        self.maximum = max(self.maximum, value)
+
+    def normalize(self, value):
+        if self.maximum > self.minimum:
+            return (value - self.minimum) / (self.maximum - self.minimum)
+        return value
+
+
+def ucb_score(config, parent, child, min_max_stats):
+    pb_c = math.log((parent.visit_count + config["pb_c_base"] + 1) / config["pb_c_base"]) + config["pb_c_init"]
+    pb_c *= math.sqrt(max(parent.visit_count, 1)) / (child.visit_count + 1)
+    prior_score = pb_c * child.prior
+    value_score = 0.0
+    if child.visit_count > 0:
+        q_value = child.reward + config["discount"] * child.value()
+        value_score = min_max_stats.normalize(q_value)
+    return prior_score + value_score
+
+
+def select_child(config, node, min_max_stats):
+    scores = [(ucb_score(config, node, child, min_max_stats), action, child) for action, child in node.children.items()]
+    _, action, child = max(scores, key=lambda item: item[0])
+    return action, child
+
+
 def run_mctx(config, network, obs):
     """Runs MCTS to build a search tree and returns the improved policy."""
     root = Node(0)
@@ -135,6 +168,7 @@ def run_mctx(config, network, obs):
         root.children[a].prior = root.children[a].prior * (1 - config['dirichlet_eps']) + noise[a] * config['dirichlet_eps']
         
     # 2. Run Simulations
+    min_max_stats = MinMaxStats()
     for _ in range(config['num_simulations']):
         node = root
         search_path = [node]
@@ -142,23 +176,8 @@ def run_mctx(config, network, obs):
         
         # Traverse
         while node.expanded():
-            # UCB selection
-            best_score = -float('inf')
-            best_action = -1
-            
-            for a, child in node.children.items():
-                # UCB Score = Q(s, a) + c * P(s, a) * sqrt(N(s)) / (1 + N(s, a))
-                q_value = child.value()
-                exploration_term = config['pb_c_init'] * child.prior * math.sqrt(node.visit_count) / (1 + child.visit_count)
-                score = q_value + exploration_term
-                
-                if score > best_score:
-                    best_score = score
-                    best_action = a
-            
-            action = best_action
+            action, node = select_child(config, node, min_max_stats)
             history.append(action)
-            node = node.children[action]
             search_path.append(node)
             
         # Expand and Evaluate Leaf
@@ -181,12 +200,13 @@ def run_mctx(config, network, obs):
         for node in reversed(search_path):
             node.value_sum += v
             node.visit_count += 1
+            min_max_stats.update(node.value())
             # Discount value for the parent
             v = node.reward + config['discount'] * v
             
     # 3. Calculate Target Policy from Visit Counts
     visit_counts = np.array([root.children[a].visit_count for a in range(config['action_dim'])])
-    policy = visit_counts / np.sum(visit_counts)
+    policy = visit_counts / max(np.sum(visit_counts), 1)
     return policy, root.value()
 
 # ==============================================================================
@@ -218,7 +238,7 @@ class ReplayBuffer:
             self.buffer.pop(0)
         self.buffer.append(game)
         
-    def sample(self, batch_size, unroll_steps):
+    def sample(self, batch_size, unroll_steps, config):
         # We sample an observation, and then sequences of length `unroll_steps`
         obs_batch, action_batch, reward_batch, policy_batch, value_batch = [], [], [], [], []
         
@@ -236,13 +256,18 @@ class ReplayBuffer:
                 if start + i < len(game.observations):
                     actions.append(game.actions[start + i])
                     rewards.append(game.rewards[start + i])
-                    policies.append(game.target_policies[start + i])
-                    values.append(game.target_values[start + i])
                 else:
                     # Absorbing state (game ended)
-                    actions.append(np.random.randint(2))
+                    actions.append(np.random.randint(config["action_dim"]))
                     rewards.append(0.0)
-                    policies.append(np.ones(2)/2)
+
+            for i in range(unroll_steps + 1):
+                idx = start + i
+                if idx < len(game.observations):
+                    policies.append(game.target_policies[idx])
+                    values.append(make_value_target(game, idx, config))
+                else:
+                    policies.append(np.ones(config["action_dim"]) / config["action_dim"])
                     values.append(0.0)
                     
             action_batch.append(actions)
@@ -258,6 +283,18 @@ class ReplayBuffer:
             torch.FloatTensor(np.array(value_batch)).to(device)
         )
 
+
+def make_value_target(game, start, config):
+    value = 0.0
+    discount = 1.0
+    bootstrap_index = start + config["td_steps"]
+    for i in range(start, min(bootstrap_index, len(game.rewards))):
+        value += discount * game.rewards[i]
+        discount *= config["discount"]
+    if bootstrap_index < len(game.target_values):
+        value += discount * game.target_values[bootstrap_index]
+    return value
+
 # ==============================================================================
 # 4. Training Loop (BPTT)
 # ==============================================================================
@@ -270,8 +307,10 @@ def train():
         'num_simulations': 25, # MCTS runs per real environment step
         'discount': 0.99,
         'pb_c_init': 1.25, # UCB exploration constant
+        'pb_c_base': 19652,
         'dirichlet_alpha': 0.25,
         'dirichlet_eps': 0.25,
+        'td_steps': 5,
         'unroll_steps': 5, # Unroll K steps during BPTT training
         'batch_size': 64,
         'num_games': 200,
@@ -302,9 +341,6 @@ def train():
             done = terminated or truncated
             total_reward += reward
             
-            # Termination penalty for CartPole
-            if terminated: reward = -1.0
-            
             game.store_search_statistics(obs, action, reward, policy, root_value)
             obs = next_obs
             
@@ -314,7 +350,7 @@ def train():
         # --- Unrolled BPTT Training ---
         if len(buffer.buffer) > 10:
             for _ in range(2): # Optimize multiple times per game added
-                obs_batch, act_batch, rew_batch, pol_batch, val_batch = buffer.sample(config['batch_size'], config['unroll_steps'])
+                obs_batch, act_batch, rew_batch, pol_batch, val_batch = buffer.sample(config['batch_size'], config['unroll_steps'], config)
                 
                 loss = 0
                 
@@ -336,8 +372,8 @@ def train():
                     hidden_state, reward, policy_logits, value = network.recurrent_inference(hidden_state, action)
                     
                     target_reward = rew_batch[:, k].unsqueeze(1)
-                    target_value = val_batch[:, k].unsqueeze(1)
-                    target_policy = pol_batch[:, k]
+                    target_value = val_batch[:, k + 1].unsqueeze(1)
+                    target_policy = pol_batch[:, k + 1]
                     
                     # Scale losses by 1/K
                     loss += (1.0 / config['unroll_steps']) * F.mse_loss(reward, target_reward)

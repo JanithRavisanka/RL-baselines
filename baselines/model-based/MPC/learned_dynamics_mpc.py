@@ -60,6 +60,38 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
+
+class TransitionNormalizer:
+    def __init__(self, state_dim, action_dim, eps=1e-6):
+        self.eps = eps
+        self.state_mean = torch.zeros(state_dim, device=device)
+        self.state_std = torch.ones(state_dim, device=device)
+        self.action_mean = torch.zeros(action_dim, device=device)
+        self.action_std = torch.ones(action_dim, device=device)
+        self.delta_mean = torch.zeros(state_dim, device=device)
+        self.delta_std = torch.ones(state_dim, device=device)
+
+    def update(self, buffer):
+        states, actions, next_states = map(np.stack, zip(*buffer.buffer))
+        states_t = torch.FloatTensor(states).to(device)
+        actions_t = torch.FloatTensor(actions).to(device)
+        deltas_t = torch.FloatTensor(next_states - states).to(device)
+        self.state_mean = states_t.mean(0)
+        self.state_std = states_t.std(0).clamp_min(self.eps)
+        self.action_mean = actions_t.mean(0)
+        self.action_std = actions_t.std(0).clamp_min(self.eps)
+        self.delta_mean = deltas_t.mean(0)
+        self.delta_std = deltas_t.std(0).clamp_min(self.eps)
+
+    def inputs(self, states, actions):
+        return (states - self.state_mean) / self.state_std, (actions - self.action_mean) / self.action_std
+
+    def deltas(self, deltas):
+        return (deltas - self.delta_mean) / self.delta_std
+
+    def denorm_delta(self, deltas):
+        return deltas * self.delta_std + self.delta_mean
+
 def pendulum_reward_fn(state, action):
     """
     Vectorized reward function for Pendulum-v1.
@@ -78,101 +110,121 @@ def pendulum_reward_fn(state, action):
     cost = th**2 + 0.1 * (th_dot**2) + 0.001 * (action.squeeze(-1)**2)
     return -cost
 
-class RandomShootingPlanner:
+class CEMPlanner:
     """
-    Uses the Dynamics Model to simulate thousands of imaginary trajectories,
-    evaluates them, and picks the best immediate action.
+    Cross-entropy method MPC with an ensemble dynamics model.
     """
-    def __init__(self, dynamics_model, action_dim, num_sequences=1000, horizon=15):
-        self.model = dynamics_model
+    def __init__(self, dynamics_models, normalizer, action_dim, action_low, action_high, num_sequences=512, horizon=20, elite_frac=0.1, iterations=4):
+        self.models = dynamics_models
+        self.normalizer = normalizer
         self.action_dim = action_dim
+        self.action_low = torch.FloatTensor(action_low).to(device)
+        self.action_high = torch.FloatTensor(action_high).to(device)
         self.K = num_sequences # Number of parallel imaginary trajectories
         self.H = horizon       # How many steps into the future to simulate
+        self.elite_frac = elite_frac
+        self.iterations = iterations
+
+    def predict_delta(self, states, actions):
+        norm_states, norm_actions = self.normalizer.inputs(states, actions)
+        preds = []
+        for model in self.models:
+            preds.append(self.normalizer.denorm_delta(model(norm_states, norm_actions)))
+        return torch.stack(preds, dim=0).mean(0)
+
+    def rollout_return(self, current_state, action_sequences):
+        state_batch = torch.FloatTensor(current_state).unsqueeze(0).repeat(self.K, 1).to(device)
+        cumulative_rewards = torch.zeros(self.K).to(device)
+        for t in range(self.H):
+            actions_t = action_sequences[t]
+            next_state_batch = state_batch + self.predict_delta(state_batch, actions_t)
+            norm = torch.sqrt(next_state_batch[:, 0]**2 + next_state_batch[:, 1]**2 + 1e-8)
+            next_state_batch[:, 0] /= norm
+            next_state_batch[:, 1] /= norm
+            cumulative_rewards += pendulum_reward_fn(next_state_batch, actions_t)
+            state_batch = next_state_batch
+        return cumulative_rewards
 
     def get_action(self, current_state):
-        self.model.eval()
+        for model in self.models:
+            model.eval()
         with torch.no_grad():
-            # 1. Create K identical starting states
-            # state shape: (K, state_dim)
-            state_batch = torch.FloatTensor(current_state).unsqueeze(0).repeat(self.K, 1).to(device)
-            
-            # 2. Generate completely random action sequences
-            # Pendulum actions are between -2.0 and 2.0
-            # action_sequences shape: (H, K, action_dim)
-            action_sequences = torch.FloatTensor(self.H, self.K, self.action_dim).uniform_(-2.0, 2.0).to(device)
-            
-            # Array to store the total cumulative reward for each of the K sequences
-            cumulative_rewards = torch.zeros(self.K).to(device)
-            
-            # 3. Simulate the future!
-            for t in range(self.H):
-                actions_t = action_sequences[t]
-                
-                # Predict delta state using our learned physics model
-                delta_s = self.model(state_batch, actions_t)
-                
-                # Predict next state
-                next_state_batch = state_batch + delta_s
-                
-                # Normalize cos and sin to ensure it stays a valid angle (cos^2 + sin^2 = 1)
-                norm = torch.sqrt(next_state_batch[:, 0]**2 + next_state_batch[:, 1]**2 + 1e-8)
-                next_state_batch[:, 0] /= norm
-                next_state_batch[:, 1] /= norm
-                
-                # Evaluate how good this state is
-                rewards = pendulum_reward_fn(next_state_batch, actions_t)
-                cumulative_rewards += rewards
-                
-                state_batch = next_state_batch
-                
-            # 4. Find the sequence that yielded the highest total reward
-            best_sequence_idx = torch.argmax(cumulative_rewards).item()
-            
-            # 5. We only return the *first* action of the best sequence. 
-            # In MPC, we replan from scratch at the next real step!
-            best_first_action = action_sequences[0, best_sequence_idx].cpu().numpy()
-            
+            mean = torch.zeros(self.H, self.action_dim, device=device)
+            std = torch.ones_like(mean) * (self.action_high - self.action_low) / 2.0
+            elite_count = max(1, int(self.K * self.elite_frac))
+            best_sequence = None
+            for _ in range(self.iterations):
+                noise = torch.randn(self.H, self.K, self.action_dim, device=device)
+                action_sequences = mean[:, None, :] + std[:, None, :] * noise
+                action_sequences = torch.max(torch.min(action_sequences, self.action_high), self.action_low)
+                returns = self.rollout_return(current_state, action_sequences)
+                elite_idx = torch.topk(returns, elite_count).indices
+                elites = action_sequences[:, elite_idx]
+                mean = elites.mean(dim=1)
+                std = elites.std(dim=1).clamp_min(0.05)
+                best_sequence = action_sequences[:, torch.argmax(returns)]
+
+            best_first_action = best_sequence[0].cpu().numpy()
         return best_first_action
 
-def train_dynamics_model(model, optimizer, buffer, batch_size=256, epochs=10):
+def train_dynamics_model(models, optimizers, normalizer, buffer, batch_size=256, epochs=10):
     if len(buffer) < batch_size:
         return 0.0
-        
-    model.train()
+
+    normalizer.update(buffer)
+    for model in models:
+        model.train()
     total_loss = 0
     
     for _ in range(epochs):
-        # Sample real-world transitions
         states, actions, next_states = buffer.sample(batch_size)
-        
         states_t = torch.FloatTensor(states).to(device)
         actions_t = torch.FloatTensor(actions).to(device)
         next_states_t = torch.FloatTensor(next_states).to(device)
-        
-        # Calculate the true delta we want to predict
         true_deltas = next_states_t - states_t
-        
-        # Predict delta
-        pred_deltas = model(states_t, actions_t)
-        
-        # MSE Loss
-        loss = F.mse_loss(pred_deltas, true_deltas)
-        
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        total_loss += loss.item()
-        
+
+        norm_states, norm_actions = normalizer.inputs(states_t, actions_t)
+        target_deltas = normalizer.deltas(true_deltas)
+        loss = 0.0
+        for model, optimizer in zip(models, optimizers):
+            pred_deltas = model(norm_states, norm_actions)
+            model_loss = F.mse_loss(pred_deltas, target_deltas)
+            optimizer.zero_grad()
+            model_loss.backward()
+            optimizer.step()
+            loss += model_loss.item()
+        loss /= len(models)
+        total_loss += loss
+
     return total_loss / epochs
+
+
+def validate_multistep(models, normalizer, buffer, horizon=5, samples=256):
+    if len(buffer) < horizon + 1:
+        return 0.0
+    planner = CEMPlanner(models, normalizer, action_dim=1, action_low=[-2.0], action_high=[2.0], num_sequences=1, horizon=horizon)
+    errors = []
+    max_start = max(0, len(buffer.buffer) - horizon)
+    for _ in range(min(samples, max_start)):
+        start = random.randint(0, max_start - 1)
+        state = torch.FloatTensor(buffer.buffer[start][0]).unsqueeze(0).to(device)
+        with torch.no_grad():
+            pred = state.clone()
+            for t in range(horizon):
+                action = torch.FloatTensor(buffer.buffer[start + t][1]).unsqueeze(0).to(device)
+                pred = pred + planner.predict_delta(pred, action)
+            actual = torch.FloatTensor(buffer.buffer[start + horizon - 1][2]).unsqueeze(0).to(device)
+            errors.append(F.mse_loss(pred, actual).item())
+    return float(np.mean(errors)) if errors else 0.0
 
 def train():
     env = gym.make('Pendulum-v1')
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     
-    dynamics_model = DynamicsModel(state_dim, action_dim).to(device)
-    optimizer = optim.Adam(dynamics_model.parameters(), lr=1e-3)
+    dynamics_models = [DynamicsModel(state_dim, action_dim).to(device) for _ in range(5)]
+    optimizers = [optim.Adam(model.parameters(), lr=1e-3) for model in dynamics_models]
+    normalizer = TransitionNormalizer(state_dim, action_dim)
     
     buffer = ReplayBuffer(capacity=100000)
     
@@ -192,9 +244,16 @@ def train():
             
     # Train the initial physics model heavily
     print("Training initial Dynamics Model...")
-    train_dynamics_model(dynamics_model, optimizer, buffer, batch_size=256, epochs=100)
-    
-    planner = RandomShootingPlanner(dynamics_model, action_dim, num_sequences=1000, horizon=15)
+    train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=256, epochs=100)
+    planner = CEMPlanner(
+        dynamics_models,
+        normalizer,
+        action_dim,
+        env.action_space.low,
+        env.action_space.high,
+        num_sequences=512,
+        horizon=20,
+    )
     
     num_episodes = 25 # MPC evaluates paths online, so it requires very few episodes compared to model-free!
     episode_rewards = []
@@ -222,11 +281,12 @@ def train():
         
         # After every episode, retrain the dynamics model with the newly collected data
         # This fixes any inaccuracies the model had!
-        loss = train_dynamics_model(dynamics_model, optimizer, buffer, batch_size=256, epochs=10)
-        print(f"   -> Dynamics Model retrained. Avg MSE Loss: {loss:.5f}")
+        loss = train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=256, epochs=10)
+        rollout_mse = validate_multistep(dynamics_models, normalizer, buffer, horizon=5)
+        print(f"   -> Dynamics Model retrained. One-step MSE: {loss:.5f} | 5-step rollout MSE: {rollout_mse:.5f}")
 
     env.close()
-    return dynamics_model, planner, episode_rewards
+    return dynamics_models, planner, episode_rewards
 
 def plot_rewards(rewards, save_dir):
     plt.figure(figsize=(10, 5))
@@ -250,7 +310,7 @@ def evaluate_and_record(planner, save_dir):
     total_reward = 0
     
     # We increase sequences during evaluation for even better planning!
-    planner.K = 2000 
+    planner.K = 1024
     
     while not done:
         frames.append(env.render())
@@ -272,11 +332,11 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    model, planner, rewards = train()
+    models, planner, rewards = train()
     
-    model_path = os.path.join(save_dir, "dynamics_model.pth")
-    torch.save(model.state_dict(), model_path)
-    print(f"Dynamics Model saved to {model_path}")
+    model_path = os.path.join(save_dir, "dynamics_ensemble.pth")
+    torch.save([model.state_dict() for model in models], model_path)
+    print(f"Dynamics ensemble saved to {model_path}")
     
     plot_rewards(rewards, save_dir)
     evaluate_and_record(planner, save_dir)

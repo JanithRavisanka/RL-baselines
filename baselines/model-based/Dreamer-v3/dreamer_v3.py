@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import imageio
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from dreamer_common import ConvDecoder, ConvEncoder, DiscreteRSSM, MLPHead, lambda_return, symlog
+from dreamer_common import ConvDecoder, ConvEncoder, DiscreteRSSM, MLPHead, free_nats_loss, lambda_return, symlog
 
 
 def device():
@@ -89,6 +89,54 @@ class DreamerV3(nn.Module):
         return torch.distributions.Categorical(logits=logits)
 
 
+def detach_state(state):
+    return {k: v.detach() for k, v in state.items()}
+
+
+def mask_state(state, done):
+    alive = 1.0 - done
+    return {
+        "deter": state["deter"] * alive.unsqueeze(-1),
+        "stoch": state["stoch"] * alive.view(-1, 1, 1),
+        "probs": state.get("probs", state["stoch"]) * alive.view(-1, 1, 1),
+    }
+
+
+def apply_unimix_state(state, mix=0.01):
+    if "probs" not in state:
+        return state
+    return {**state, "probs": unimix_probs(state["probs"], mix=mix)}
+
+
+def imagine_behavior(model, start, horizon, action_dim, gamma, lambda_):
+    state = detach_state(start)
+    imag_feats, rewards, values, discounts, logps, entropies = [], [], [], [], [], []
+    for _ in range(horizon):
+        feat = model.feat(state)
+        dist = model.actor_dist(feat)
+        action = dist.sample()
+        probs = dist.probs
+        action_oh = F.one_hot(action, action_dim).float()
+        action_oh = action_oh + probs - probs.detach()
+        state = apply_unimix_state(model.rssm.imagine_step(state, action_oh), mix=0.01)
+        imag_feat = model.feat(state)
+        cont = torch.sigmoid(model.cont(imag_feat).squeeze(-1)) * gamma
+        imag_feats.append(imag_feat)
+        rewards.append(model.reward(imag_feat).squeeze(-1))
+        values.append(model.value(imag_feat).squeeze(-1))
+        discounts.append(cont)
+        logps.append(dist.log_prob(action))
+        entropies.append(dist.entropy())
+
+    imag_feats = torch.stack(imag_feats, 0)
+    rewards = torch.stack(rewards, 0)
+    values = torch.stack(values, 0)
+    discounts = torch.stack(discounts, 0)
+    bootstrap = model.value(model.feat(state)).squeeze(-1)
+    targets = lambda_return(rewards, values, discounts, bootstrap, lambda_)
+    return imag_feats, targets, values, torch.stack(logps, 0), torch.stack(entropies, 0)
+
+
 def preprocess_frame(frame):
     frame = np.ascontiguousarray(np.asarray(frame))
     if frame.ndim == 2:
@@ -135,6 +183,7 @@ def train(args):
         for t in range(args.seq_len):
             action_oh = F.one_hot(act_b[:, t], action_dim).float()
             embed = model.encoder(obs_b[:, t])
+            state = mask_state(state, done_b[:, t - 1]) if t > 0 else state
             post, prior = model.rssm.observe_step(state, action_oh, embed)
             post = {**post, "probs": unimix_probs(post["probs"], mix=0.01)}
             prior = {**prior, "probs": unimix_probs(prior["probs"], mix=0.01)}
@@ -154,9 +203,9 @@ def train(args):
         cont_logits = model.cont(feats).squeeze(-1)
         cont_target = 1.0 - done_b.transpose(0, 1)
         cont_loss = F.binary_cross_entropy_with_logits(cont_logits, cont_target)
-        kl = torch.stack([model.rssm.kl(p, r) for p, r in zip(posts, priors)], 0).mean()
-        dyn_loss = torch.clamp(kl, min=1.0)
-        rep_loss = torch.clamp(kl, min=1.0)
+        kl = torch.stack([model.rssm.kl(p, r) for p, r in zip(posts, priors)], 0)
+        dyn_loss = free_nats_loss(kl.detach(), 1.0)
+        rep_loss = free_nats_loss(kl, 1.0)
         world_loss = obs_loss + reward_loss + cont_loss + 0.5 * dyn_loss + 0.1 * rep_loss
 
         world_opt.zero_grad()
@@ -164,16 +213,10 @@ def train(args):
         nn.utils.clip_grad_norm_(world_params, 100.0)
         world_opt.step()
 
-        with torch.no_grad():
-            value = model.value(feats).squeeze(-1)
-            discount = torch.sigmoid(cont_logits).detach() * 0.997
-            target = lambda_return(reward_pred.detach(), value, discount, value[-1], 0.95)
-            advantage = target - value
-
-        dist = model.actor_dist(feats.detach())
-        act = dist.sample()
-        logp = dist.log_prob(act)
-        entropy = dist.entropy()
+        imag_feats, imag_target, imag_value, logp, entropy = imagine_behavior(
+            model, posts[-1], horizon=15, action_dim=action_dim, gamma=0.997, lambda_=0.95
+        )
+        advantage = imag_target - imag_value
         actor_loss = -(logp * advantage.detach() + 3e-4 * entropy).mean()
 
         actor_opt.zero_grad()
@@ -181,8 +224,8 @@ def train(args):
         nn.utils.clip_grad_norm_(model.actor.parameters(), 100.0)
         actor_opt.step()
 
-        value_pred = model.value(feats.detach()).squeeze(-1)
-        value_loss = F.mse_loss(value_pred, target.detach())
+        value_pred = model.value(imag_feats.detach()).squeeze(-1)
+        value_loss = F.mse_loss(value_pred, imag_target.detach())
         value_opt.zero_grad()
         value_loss.backward()
         nn.utils.clip_grad_norm_(model.value.parameters(), 100.0)
