@@ -100,11 +100,37 @@ def detach_state(state):
 
 
 def mask_state(state, done):
+    # `done` is [B]; convert to [B, 1] so it broadcasts across latent dims.
+    # Multiplying by (1 - done) resets latent carry-over exactly at episode
+    # boundaries, preventing the RSSM from learning impossible cross-episode
+    # transitions in sequence chunks sampled from replay.
     alive = (1.0 - done).unsqueeze(-1)
     return {k: v * alive for k, v in state.items()}
 
 
 def imagine_behavior(model, start, horizon, gamma, lambda_):
+    """
+    Train behavior from imagined latent rollouts (Dreamer core idea).
+
+    Start from posterior state, then roll prior forward using actor actions.
+    Reward/value targets are computed entirely in latent space.
+
+    Tensor flow through the imagination loop:
+    - Input `start`: batched latent state dict from posterior, shape-wise
+      approx `deter:[B,D]`, `stoch:[B,S]`.
+    - For each imagined step k in [0, horizon):
+      1) actor samples action a_k from policy(feat_k),
+      2) RSSM prior transition predicts next latent state,
+      3) reward/value heads evaluate that imagined feature.
+    - Stacked outputs become time-major `[H, B, ...]` for lambda-return.
+
+    Important assumption: these trajectories are model-generated, so the actor
+    is optimized for expected return under learned dynamics, not directly under
+    the environment transition function.
+    """
+    # Stop gradients into the world-model posterior trajectory used as the
+    # imagination starting point; actor/value updates should not backprop through
+    # replay unroll history.
     state = detach_state(start)
     imag_feats, rewards, values, discounts, entropies = [], [], [], [], []
     for _ in range(horizon):
@@ -116,6 +142,8 @@ def imagine_behavior(model, start, horizon, gamma, lambda_):
         imag_feats.append(imag_feat)
         rewards.append(model.reward(imag_feat).squeeze(-1))
         values.append(model.value(imag_feat).squeeze(-1))
+        # Constant continuation here corresponds to no terminal mask inside
+        # imagination. This matches the standard fixed-horizon Dreamer objective.
         discounts.append(torch.full_like(rewards[-1], gamma))
         entropies.append(dist.entropy().sum(-1))
 
@@ -123,6 +151,8 @@ def imagine_behavior(model, start, horizon, gamma, lambda_):
     rewards = torch.stack(rewards, 0)
     values = torch.stack(values, 0)
     discounts = torch.stack(discounts, 0)
+    # Bootstrap with critic estimate at the final imagined state so return
+    # targets include value beyond finite imagination horizon.
     bootstrap = model.value(model.feat(state)).squeeze(-1)
     targets = lambda_return(rewards, values, discounts, bootstrap, lambda_)
     return imag_feats, targets, values, torch.stack(entropies, 0)
@@ -176,6 +206,8 @@ def train(args):
 
     obs, _ = env.reset()
     obs = to_pixel_observation(env, obs)
+    # Random-policy prefill gives the world model a minimum coverage dataset
+    # before any model-based behavior learning starts.
     for step in range(args.prefill):
         action = env.action_space.sample()
         nxt, rew, term, trunc, _ = env.step(action)
@@ -196,6 +228,14 @@ def train(args):
 
         state = model.rssm.init_state(cfg.batch_size, dev)
         posts, priors, feats = [], [], []
+        # World-model training on replay sequences:
+        # - encode each frame to embedding e_t,
+        # - update posterior/prior with RSSM observe step,
+        # - decode/reward-predict from posterior features.
+        #
+        # `done_b[:, t-1]` mask zeroes latent state before consuming transition t
+        # when the previous step ended an episode. This enforces correct Markov
+        # boundaries even though replay slices may contain adjacent episodes.
         for t in range(cfg.seq_len):
             embed = model.encoder(obs_b[:, t])
             state = mask_state(state, done_b[:, t - 1]) if t > 0 else state
@@ -212,6 +252,8 @@ def train(args):
         recon_loss = F.mse_loss(torch.sigmoid(recon), target)
         reward_pred = model.reward(feats).squeeze(-1)
         reward_loss = F.mse_loss(reward_pred, rew_b.transpose(0, 1))
+        # KL per time-step and batch element: KL(q(z_t|h_t,e_t) || p(z_t|h_t)).
+        # This is the representation-vs-dynamics consistency term in the ELBO.
         kl = torch.stack([model.rssm.kl(p, r) for p, r in zip(posts, priors)], 0)
         kl_loss = free_nats_loss(kl, cfg.free_nats)
         world_loss = recon_loss + reward_loss + cfg.kl_scale * kl_loss
@@ -221,6 +263,9 @@ def train(args):
         nn.utils.clip_grad_norm_(world_params, 100.0)
         world_opt.step()
 
+        # Behavior learning phase:
+        # actor/value are trained on prior-only imagined trajectories rather than
+        # directly on replay states, which is what makes Dreamer model-based.
         imag_feats, imag_target, imag_value, entropy = imagine_behavior(
             model, posts[-1], cfg.horizon, cfg.gamma, cfg.lambda_
         )
@@ -287,14 +332,20 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
                 frames.append(frame)
             obs_t = torch.tensor(obs, dtype=torch.uint8, device=dev).unsqueeze(0)
             embed = model.encoder(obs_t)
+            # Evaluation keeps the latent filter online using real observations:
+            # posterior update conditions on current frame embedding + previous
+            # action, then actor chooses action from current latent feature.
             post, _ = model.rssm.observe_step(state, prev_action, embed)
             feat = model.feat(post)
             dist = model.actor_dist(feat)
+            # Deterministic evaluation uses policy mean (no sampling noise),
+            # assuming this better reflects converged control behavior.
             action = torch.clamp(dist.mean, -1.0, 1.0)
             nxt, rew, term, trunc, _ = env.step(action.squeeze(0).cpu().numpy())
             done = term or trunc
             total_reward += rew
-            obs = to_pixel_observation(env, nxt if not done else env.reset()[0])
+            if not done:
+                obs = to_pixel_observation(env, nxt)
             state = post
             prev_action = action
             steps += 1

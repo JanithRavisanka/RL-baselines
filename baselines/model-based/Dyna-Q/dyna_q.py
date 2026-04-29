@@ -39,6 +39,13 @@ class DynaQAgent:
             return np.random.choice(best_actions)
 
     def learn(self, state, action, reward, next_state, done):
+        """
+        One real update + N planning updates.
+
+        Real transition update teaches Q directly from environment feedback.
+        Planning updates reuse the learned model to perform extra simulated backups,
+        which is the core sample-efficiency gain in Dyna-Q.
+        """
         # (d) Direct RL Update
         best_next_action = np.argmax(self.q_table[next_state])
         td_target = reward if done else reward + self.gamma * self.q_table[next_state][best_next_action]
@@ -54,7 +61,9 @@ class DynaQAgent:
             
         self.model[(state, action)] = (reward, next_state, done)
 
-        # (f) Planning Loop
+        # (f) Planning Loop:
+        # Uniformly sample previously observed (state, action) pairs from the model
+        # and apply the same Q-learning backup as if they were real experiences.
         for _ in range(self.planning_steps):
             # S <- random previously observed state
             sim_state = random.choice(self.observed_states)
@@ -72,6 +81,12 @@ class DynaQAgent:
 
 
 def evaluate_policy(agent, env_name='CliffWalking-v1', episodes=5, max_steps=100):
+    """
+    Greedy evaluation separated from exploratory training returns.
+
+    This is crucial for CliffWalking: training episodes include epsilon exploration
+    and therefore can look noisy even when the learned greedy policy is optimal.
+    """
     env = gym.make(env_name)
     original_epsilon = agent.epsilon
     agent.epsilon = 0.0
@@ -120,7 +135,7 @@ def train():
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             
-            # (d, e, f) Direct RL, Model Update, and Planning Loop
+            # (d, e, f) Direct RL, Model Update, and Planning Loop in one call.
             agent.learn(state, action, reward, next_state, done)
             
             state = next_state

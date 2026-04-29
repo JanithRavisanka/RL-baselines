@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import imageio
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from dreamer_common import ConvDecoder, ConvEncoder, DiscreteRSSM, DreamerConfig, MLPHead, free_nats_loss, lambda_return
+from dreamer_common import ConvDecoder, ConvEncoder, DiscreteRSSM, DreamerConfig, MLPHead, free_nats_loss, lambda_return  # noqa: F401
 
 
 def device():
@@ -45,6 +45,15 @@ class ReplayBuffer:
         return len(self.obs)
 
     def sample(self, batch, seq):
+        # We train the world model on short contiguous trajectories instead of
+        # single transitions, because RSSM needs temporal context to learn
+        # latent dynamics and to align posterior/prior over multiple steps.
+        #
+        # Returned shapes:
+        # - obs:  [B, seq+1, C, H, W] (extra frame gives reconstruction target t+1)
+        # - act:  [B, seq]
+        # - rew:  [B, seq]
+        # - done: [B, seq]
         max_i = len(self.obs) - seq - 1
         idx = np.random.randint(0, max_i, size=batch)
         obs, act, rew, done = [], [], [], []
@@ -87,6 +96,12 @@ def detach_state(state):
 
 
 def mask_state(state, done):
+    # "done" marks terminal transition at previous step. We zero latent state
+    # before continuing unroll so the next step starts from a clean state for
+    # episodes that ended inside the sampled sequence.
+    #
+    # This avoids leaking information across episode boundaries when replay
+    # sequences are sampled blindly from a global buffer.
     alive = 1.0 - done
     return {
         "deter": state["deter"] * alive.unsqueeze(-1),
@@ -96,6 +111,17 @@ def mask_state(state, done):
 
 
 def imagine_behavior(model, start, horizon, action_dim, gamma, lambda_):
+    """
+    Discrete-action imagined rollout with straight-through one-hot actions.
+
+    Distinctive point:
+    - Actor samples categorical actions.
+    - We feed one-hot actions into RSSM prior with ST estimator so actor gradients
+      can influence imagined trajectory optimization.
+    - This keeps forward dynamics discrete (sampled action is actually executed
+      in imagination), while backprop sees a differentiable path through the
+      policy probabilities.
+    """
     state = detach_state(start)
     imag_feats, rewards, values, discounts, logps, entropies = [], [], [], [], [], []
     for _ in range(horizon):
@@ -104,6 +130,10 @@ def imagine_behavior(model, start, horizon, action_dim, gamma, lambda_):
         action = dist.sample()
         probs = dist.probs
         action_oh = F.one_hot(action, action_dim).float()
+        # Straight-through trick:
+        # - Forward pass uses sampled one-hot action (categorical control).
+        # - Backward pass uses gradient of probs as if action were continuous.
+        # This allows policy improvement through imagined latent rollouts.
         action_oh = action_oh + probs - probs.detach()
         state = model.rssm.imagine_step(state, action_oh)
         imag_feat = model.feat(state)
@@ -119,6 +149,8 @@ def imagine_behavior(model, start, horizon, action_dim, gamma, lambda_):
     values = torch.stack(values, 0)
     discounts = torch.stack(discounts, 0)
     bootstrap = model.value(model.feat(state)).squeeze(-1)
+    # Lambda returns on imagined trajectories provide low-variance, limited-bias
+    # targets for both actor advantage and critic regression.
     targets = lambda_return(rewards, values, discounts, bootstrap, lambda_)
     return imag_feats, targets, values, torch.stack(logps, 0), torch.stack(entropies, 0)
 
@@ -180,9 +212,19 @@ def train(args):
 
         state = model.rssm.init_state(cfg.batch_size, dev)
         posts, priors, feats = [], [], []
+        # World-model learning from replay sequences:
+        # 1) Encode each frame into embeddings.
+        # 2) Recurrently infer posterior z_t from embed_t and prior from
+        #    previous latent/action.
+        # 3) Decode latent features back to pixels and rewards.
+        #
+        # Sequence training (instead of single-step) is essential here: RSSM
+        # learns temporal consistency and the recurrent deterministic state.
         for t in range(cfg.seq_len):
             action_oh = F.one_hot(act_b[:, t], action_dim).float()
             embed = model.encoder(obs_b[:, t])
+            # If previous transition ended episode, zero latent before stepping.
+            # done_b[:, t-1] is used because it terminates transition into t.
             state = mask_state(state, done_b[:, t - 1]) if t > 0 else state
             post, prior = model.rssm.observe_step(state, action_oh, embed)
             feat = model.feat(post)
@@ -197,8 +239,18 @@ def train(args):
         recon_loss = F.mse_loss(torch.sigmoid(recon), target)
         reward_pred = model.reward(feats).squeeze(-1)
         reward_loss = F.mse_loss(reward_pred, rew_b.transpose(0, 1))
-        kl = torch.stack([model.rssm.kl(p, r) for p, r in zip(posts, priors)], 0)
-        kl_loss = free_nats_loss(kl, cfg.free_nats)
+        # DreamerV2 KL balancing (alpha=0.8):
+        # stronger pressure on prior to match posterior than the reverse.
+        # Intuition:
+        # - Posterior has image evidence (more accurate for current step).
+        # - Prior must become predictive for imagination.
+        # Balanced KL uses asymmetric gradient flow so prior learns to chase
+        # posterior without over-constraining posterior quality.
+        kl_terms = [DiscreteRSSM.kl_balanced(p, r, alpha=0.8) for p, r in zip(posts, priors)]
+        kl_total = torch.stack([t[0] for t in kl_terms], 0)
+        # Free-nats keeps small KL deviations unpenalized, preventing early
+        # over-regularization and posterior collapse in latent dynamics.
+        kl_loss = free_nats_loss(kl_total, cfg.free_nats)
         world_loss = recon_loss + reward_loss + cfg.kl_scale * kl_loss
 
         world_opt.zero_grad()
@@ -206,6 +258,11 @@ def train(args):
         nn.utils.clip_grad_norm_(world_params, 100.0)
         world_opt.step()
 
+        # Behavior learning over imagined latent futures:
+        # - Roll out RSSM prior from last posterior state (no new pixels).
+        # - Actor optimized with REINFORCE-style objective using imagined
+        #   advantages, plus entropy bonus for exploration.
+        # - Value regressed to lambda-return targets from same imagination.
         imag_feats, imag_target, imag_value, log_prob, entropy = imagine_behavior(
             model, posts[-1], cfg.horizon, action_dim, cfg.gamma, cfg.lambda_
         )
@@ -266,7 +323,8 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
     done = False
     steps = 0
 
-    # FIRE to start Breakout.
+    # ALE Breakout requires FIRE to launch the ball after reset; evaluation
+    # follows that convention so the policy is judged on active gameplay.
     obs, rew, term, trunc, _ = env.step(1)
     total_reward += rew
     done = term or trunc
@@ -283,12 +341,16 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
             post, _ = model.rssm.observe_step(state, prev_action, embed)
             feat = model.feat(post)
             logits = model.actor(feat)
+            # Evaluation is deterministic (argmax) rather than sampling, so
+            # reported reward reflects greedy policy performance.
             action = torch.argmax(logits, dim=-1)
             nxt, rew, term, trunc, _ = env.step(int(action.item()))
             done = term or trunc
             total_reward += rew
             obs = preprocess_frame(nxt if not done else env.reset()[0])
             state = post
+            # Keep previous action as one-hot because RSSM transition model
+            # expects the same action representation as in training.
             prev_action = F.one_hot(action, env.action_space.n).float()
             steps += 1
 

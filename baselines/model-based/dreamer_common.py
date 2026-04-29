@@ -20,6 +20,25 @@ def symexp(x: torch.Tensor) -> torch.Tensor:
 
 
 def lambda_return(reward, value, discount, bootstrap, lam):
+    """
+    Dreamer-style lambda return on latent trajectories.
+
+    Inputs are expected in time-major layout `[T, B]`:
+    - `reward[t, b]` is latent reward prediction at step t,
+    - `value[t, b]` is critic estimate V(s_t) for imagined feature s_t,
+    - `discount[t, b]` is multiplicative continuation factor (often gamma or
+      gamma * nonterminal mask),
+    - `bootstrap[b]` is value estimate after the final horizon step.
+
+    Recurrence (backward in time):
+      G_t^lambda = r_t + d_t * ((1-lambda) * V_{t+1} + lambda * G_{t+1}^lambda)
+
+    This smoothly interpolates between:
+    - TD(0)-like one-step bootstrapping when `lambda -> 0`,
+    - Monte-Carlo-like long-horizon targets when `lambda -> 1`.
+    The backward scan is used for numerical simplicity and to avoid explicit
+    powers of gamma/lambda.
+    """
     next_values = torch.cat([value[1:], bootstrap[None]], dim=0)
     target = reward + discount * ((1 - lam) * next_values)
     returns = []
@@ -32,7 +51,17 @@ def lambda_return(reward, value, discount, bootstrap, lam):
 
 
 def free_nats_loss(kl: torch.Tensor, free_nats: float) -> torch.Tensor:
-    """Only penalize KL above the free-nats threshold."""
+    """
+    Apply Dreamer "free nats" to KL regularization.
+
+    `kl` is typically `[T, B]` (or any broadcastable shape) containing per-step
+    KL(post || prior) in nats. We only penalize KL mass above `free_nats`:
+      loss = mean(max(kl - free_nats, 0))
+    Intuition:
+    - small KL is tolerated so the posterior can carry task-relevant bits
+      without being over-regularized early,
+    - very large KL is still pushed down to keep latent dynamics predictable.
+    """
     return torch.clamp(kl - free_nats, min=0.0).mean()
 
 
@@ -115,6 +144,21 @@ class ContinuousRSSM(nn.Module):
         return mean, std
 
     def observe_step(self, prev, action, embed):
+        # Observation update (filtering step) for one environment transition.
+        #
+        # Shapes (continuous variant):
+        # - prev["stoch"]: [B, stoch]
+        # - prev["deter"]: [B, deter]
+        # - action:        [B, action_dim]
+        # - embed:         [B, embed_dim]
+        #
+        # RSSM factorization at time t:
+        #   h_t      = GRU(h_{t-1}, [z_{t-1}, a_{t-1}])
+        #   p(z_t)   = p(z_t | h_t)              (prior / dynamics prediction)
+        #   q(z_t)   = q(z_t | h_t, e_t)         (posterior / representation)
+        #
+        # Training uses q(z_t) for reconstruction/reward prediction while KL
+        # aligns q toward p, so imagination can later rely on prior-only rollouts.
         x = torch.cat([prev["stoch"], action], dim=-1)
         deter = self.gru(x, prev["deter"])
         p_stats = self.prior(deter)
@@ -124,10 +168,21 @@ class ContinuousRSSM(nn.Module):
         q_mean, q_std = self._dist(q_stats)
         stoch = q_mean + q_std * torch.randn_like(q_std)
         post = {"deter": deter, "stoch": stoch, "mean": q_mean, "std": q_std}
+        # In the prior dict, `stoch` is set to mean (not a sampled z). For this
+        # implementation the KL term only uses `mean/std`, so this keeps the
+        # container lightweight without affecting losses.
         prior = {"deter": deter, "stoch": p_mean, "mean": p_mean, "std": p_std}
         return post, prior
 
     def imagine_step(self, prev, action):
+        # Prior-only transition for imagined trajectories.
+        #
+        # This is the core model-based control path: during behavior learning we
+        # cannot query real observations, so latent dynamics must propagate using
+        # only previous latent state and chosen action.
+        #   h_t, z_t ~ p(z_t | h_t),  h_t = f(h_{t-1}, z_{t-1}, a_{t-1})
+        # Returned state keeps both deterministic memory (`deter`) and sampled
+        # stochastic part (`stoch`) used by actor/value/reward heads.
         x = torch.cat([prev["stoch"], action], dim=-1)
         deter = self.gru(x, prev["deter"])
         p_mean, p_std = self._dist(self.prior(deter))
@@ -158,6 +213,8 @@ class DiscreteRSSM(nn.Module):
         return {"deter": torch.zeros(batch, self.deter, device=device), "stoch": z}
 
     def _sample(self, logits):
+        # Straight-through categorical sample:
+        # forward pass uses one-hot sample; backward uses soft probs.
         logits = logits.view(logits.shape[0], self.stoch, self.classes)
         probs = F.softmax(logits, dim=-1)
         sample = F.one_hot(torch.multinomial(probs.view(-1, self.classes), 1).squeeze(-1), self.classes).float()
@@ -166,6 +223,12 @@ class DiscreteRSSM(nn.Module):
         return sample, probs
 
     def observe_step(self, prev, action, embed):
+        # Same posterior/prior split as continuous RSSM, but with factored
+        # categorical latents of shape [B, stoch, classes].
+        #
+        # `prev["stoch"]` is flattened before GRU because GRUCell expects a
+        # single feature axis. Conceptually this still represents multiple
+        # categorical variables per step.
         prev_flat = prev["stoch"].flatten(start_dim=1)
         x = torch.cat([prev_flat, action], dim=-1)
         deter = self.gru(x, prev["deter"])
@@ -190,6 +253,23 @@ class DiscreteRSSM(nn.Module):
         q = torch.distributions.Categorical(probs=post["probs"])
         p = torch.distributions.Categorical(probs=prior["probs"])
         return torch.distributions.kl_divergence(q, p).sum(-1)
+
+    @staticmethod
+    def kl_balanced(post, prior, alpha=0.8):
+        """
+        DreamerV2-style KL balancing for discrete latents.
+
+        Two KL directions are mixed with stop-gradients:
+        - `dyn`: train prior to match posterior sample statistics,
+        - `rep`: train posterior encoder toward prior support.
+        Weight `alpha` (>0.5 in practice) emphasizes stable dynamics learning
+        while still regularizing representation drift.
+        """
+        post_sg = {"probs": post["probs"].detach()}
+        prior_sg = {"probs": prior["probs"].detach()}
+        dyn = DiscreteRSSM.kl(post_sg, prior)  # train prior to match (stop-grad) posterior
+        rep = DiscreteRSSM.kl(post, prior_sg)  # train posterior to match (stop-grad) prior
+        return alpha * dyn + (1.0 - alpha) * rep, dyn, rep
 
 
 def actor_loss(log_prob, advantage, entropy, entropy_scale=1e-3):
