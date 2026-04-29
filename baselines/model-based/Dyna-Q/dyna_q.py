@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 import random
+import argparse
 import os
 import datetime
 import matplotlib.pyplot as plt
@@ -107,15 +108,22 @@ def evaluate_policy(agent, env_name='CliffWalking-v1', episodes=5, max_steps=100
     env.close()
     return float(np.mean(returns))
 
-def train():
+def train(args):
     env_name = 'CliffWalking-v1'
     env = gym.make(env_name)
     state_dim = env.observation_space.n
     action_dim = env.action_space.n
 
-    agent = DynaQAgent(state_dim, action_dim, alpha=0.1, gamma=0.99, epsilon=0.1, planning_steps=50)
+    agent = DynaQAgent(
+        state_dim,
+        action_dim,
+        alpha=args.alpha,
+        gamma=args.gamma,
+        epsilon=args.epsilon_start,
+        planning_steps=args.planning_steps,
+    )
     
-    num_episodes = 50000 
+    num_episodes = args.num_episodes
     episode_rewards = []
     eval_rewards = []
     
@@ -143,15 +151,15 @@ def train():
             
         episode_rewards.append(total_reward)
         
-        if (episode + 1) % 50 == 0:
-            avg_reward = np.mean(episode_rewards[-50:])
+        if (episode + 1) % args.eval_interval == 0:
+            avg_reward = np.mean(episode_rewards[-args.eval_interval:])
             eval_reward = evaluate_policy(agent, env_name=env_name)
             eval_rewards.append(eval_reward)
             print(
-                f"Episode {episode + 1}/{num_episodes} | Exploratory train avg (Last 50): {avg_reward:.2f} "
+                f"Episode {episode + 1}/{num_episodes} | Exploratory train avg (Last {args.eval_interval}): {avg_reward:.2f} "
                 f"| Greedy eval avg: {eval_reward:.2f}"
             )
-        agent.epsilon = max(0.01, agent.epsilon * 0.99995)
+        agent.epsilon = max(args.epsilon_end, agent.epsilon * args.epsilon_decay)
 
     env.close()
     return agent, episode_rewards, eval_rewards
@@ -216,13 +224,24 @@ def evaluate_and_record(agent, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Dyna-Q (research-grade defaults)")
+    parser.add_argument("--num-episodes", type=int, default=100_000)
+    parser.add_argument("--planning-steps", type=int, default=100)
+    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--epsilon-start", type=float, default=0.2)
+    parser.add_argument("--epsilon-end", type=float, default=0.01)
+    parser.add_argument("--epsilon-decay", type=float, default=0.99997)
+    parser.add_argument("--eval-interval", type=int, default=100)
+    args = parser.parse_args()
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     save_dir = os.path.join(base_dir, "results", "dyna_q", f"run_{timestamp}")
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    agent, rewards, eval_rewards = train()
+    agent, rewards, eval_rewards = train(args)
     
     model_path = os.path.join(save_dir, "q_table.npy")
     np.save(model_path, agent.q_table)

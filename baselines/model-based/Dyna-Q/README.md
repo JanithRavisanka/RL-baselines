@@ -10,11 +10,30 @@ From repository root:
 python baselines/model-based/Dyna-Q/dyna_q.py
 ```
 
-No CLI arguments are defined in the current script. Hyperparameters are set in code defaults/usages:
+Research-style custom run:
 
-- agent: `alpha=0.1`, `gamma=0.99`, `epsilon=0.1`, `planning_steps=50`
-- training episodes: `50000`
-- epsilon decay per episode: `epsilon = max(0.01, epsilon * 0.99995)`
+```bash
+python baselines/model-based/Dyna-Q/dyna_q.py \
+  --num-episodes 100000 \
+  --planning-steps 100 \
+  --alpha 0.1 \
+  --gamma 0.99 \
+  --epsilon-start 0.2 \
+  --epsilon-end 0.01 \
+  --epsilon-decay 0.99997 \
+  --eval-interval 100
+```
+
+## Inputs / Arguments
+
+- `--num-episodes` (default: `100000`)
+- `--planning-steps` (default: `100`)
+- `--alpha` (default: `0.1`)
+- `--gamma` (default: `0.99`)
+- `--epsilon-start` (default: `0.2`)
+- `--epsilon-end` (default: `0.01`)
+- `--epsilon-decay` (default: `0.99997`)
+- `--eval-interval` (default: `100`)
 
 ## Dependencies
 
@@ -37,13 +56,13 @@ Files created in that run folder:
 - `training_curve.png` - exploratory returns, moving average, and periodic greedy eval.
 - `cliffwalking_agent.gif` - rendered greedy evaluation rollout.
 
-The script also prints progress every 50 episodes with:
+The script also prints progress every `eval-interval` episodes with:
 
-- exploratory train average over last 50 episodes,
+- exploratory train average over last `eval-interval` episodes,
 - greedy evaluation average from `evaluate_policy()`.
 
 ## Notes for Newcomers
 
 - Training returns can stay noisy because exploration remains active.
 - Greedy evaluation (`epsilon=0`) is logged separately to show actual policy quality.
-- Planning updates happen every real step (`planning_steps=50`), which is the sample-efficiency core of Dyna-Q.
+- Planning updates happen every real step (`planning_steps`), which is the sample-efficiency core of Dyna-Q.

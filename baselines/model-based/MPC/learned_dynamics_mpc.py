@@ -1,4 +1,5 @@
 import gymnasium as gym
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -239,13 +240,13 @@ def validate_multistep(models, normalizer, buffer, horizon=5, samples=256):
             errors.append(F.mse_loss(pred, actual).item())
     return float(np.mean(errors)) if errors else 0.0
 
-def train():
+def train(args):
     env = gym.make('Pendulum-v1')
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     
-    dynamics_models = [DynamicsModel(state_dim, action_dim).to(device) for _ in range(5)]
-    optimizers = [optim.Adam(model.parameters(), lr=1e-3) for model in dynamics_models]
+    dynamics_models = [DynamicsModel(state_dim, action_dim).to(device) for _ in range(args.ensemble_size)]
+    optimizers = [optim.Adam(model.parameters(), lr=args.lr) for model in dynamics_models]
     normalizer = TransitionNormalizer(state_dim, action_dim)
     
     buffer = ReplayBuffer(capacity=100000)
@@ -254,7 +255,7 @@ def train():
     # We must show the model *some* real physics before it can plan!
     print("Collecting seed dataset with random actions...")
     state, _ = env.reset()
-    for _ in range(2000):
+    for _ in range(args.seed_steps):
         action = env.action_space.sample()
         next_state, _, terminated, truncated, _ = env.step(action)
         buffer.push(state, action, next_state)
@@ -266,18 +267,21 @@ def train():
             
     # Train the initial physics model heavily
     print("Training initial Dynamics Model...")
-    train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=256, epochs=100)
+    train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=args.batch_size, epochs=args.initial_epochs)
     planner = CEMPlanner(
         dynamics_models,
         normalizer,
         action_dim,
         env.action_space.low,
         env.action_space.high,
-        num_sequences=512,
-        horizon=20,
+        num_sequences=args.num_sequences,
+        horizon=args.horizon,
+        elite_frac=args.elite_frac,
+        iterations=args.cem_iterations,
+        gamma=args.gamma,
     )
     
-    num_episodes = 25 # MPC evaluates paths online, so it requires very few episodes compared to model-free!
+    num_episodes = args.num_episodes # MPC evaluates paths online.
     episode_rewards = []
     
     print("Starting MPC Control loop...")
@@ -303,8 +307,8 @@ def train():
         
         # After every episode, retrain the dynamics model with the newly collected data
         # This fixes any inaccuracies the model had!
-        loss = train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=256, epochs=10)
-        rollout_mse = validate_multistep(dynamics_models, normalizer, buffer, horizon=5)
+        loss = train_dynamics_model(dynamics_models, optimizers, normalizer, buffer, batch_size=args.batch_size, epochs=args.retrain_epochs)
+        rollout_mse = validate_multistep(dynamics_models, normalizer, buffer, horizon=args.validation_horizon)
         print(f"   -> Dynamics Model retrained. One-step MSE: {loss:.5f} | 5-step rollout MSE: {rollout_mse:.5f}")
 
     env.close()
@@ -348,13 +352,29 @@ def evaluate_and_record(planner, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Learned Dynamics MPC (research-grade defaults)")
+    parser.add_argument("--ensemble-size", type=int, default=7)
+    parser.add_argument("--seed-steps", type=int, default=10_000)
+    parser.add_argument("--initial-epochs", type=int, default=300)
+    parser.add_argument("--retrain-epochs", type=int, default=30)
+    parser.add_argument("--num-episodes", type=int, default=100)
+    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--num-sequences", type=int, default=2_048)
+    parser.add_argument("--horizon", type=int, default=30)
+    parser.add_argument("--cem-iterations", type=int, default=6)
+    parser.add_argument("--elite-frac", type=float, default=0.05)
+    parser.add_argument("--validation-horizon", type=int, default=10)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    args = parser.parse_args()
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     save_dir = os.path.join(base_dir, "results", "mpc", f"run_{timestamp}")
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    models, planner, rewards = train()
+    models, planner, rewards = train(args)
     
     model_path = os.path.join(save_dir, "dynamics_ensemble.pth")
     torch.save([model.state_dict() for model in models], model_path)

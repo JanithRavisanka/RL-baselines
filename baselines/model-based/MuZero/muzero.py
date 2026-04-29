@@ -1,6 +1,7 @@
 import os
 import datetime
 import math
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -321,28 +322,28 @@ def temperature_schedule(episode):
     return 0.25
 
 
-def train():
+def train(args):
     env = gym.make("CartPole-v1")
     config = {
         'obs_dim': env.observation_space.shape[0],
         'action_dim': env.action_space.n,
-        'num_simulations': 25, # MCTS runs per real environment step
+        'num_simulations': args.num_simulations, # MCTS runs per real environment step
         'discount': 0.99,
         'pb_c_init': 1.25, # UCB exploration constant
         'pb_c_base': 19652,
         'dirichlet_alpha': 0.25,
         'dirichlet_eps': 0.25,
-        'td_steps': 5,
-        'unroll_steps': 5, # Unroll K steps during BPTT training
-        'batch_size': 64,
-        'num_games': 2000,
-        'lr': 0.002,
+        'td_steps': args.td_steps,
+        'unroll_steps': args.unroll_steps, # Unroll K steps during BPTT training
+        'batch_size': args.batch_size,
+        'num_games': args.num_games,
+        'lr': args.lr,
         'temperature_fn': temperature_schedule,
     }
     
     network = MuZeroNetwork(config['obs_dim'], config['action_dim']).to(device)
     optimizer = optim.Adam(network.parameters(), lr=config['lr'], weight_decay=1e-4)
-    buffer = ReplayBuffer(capacity=500)
+    buffer = ReplayBuffer(capacity=args.replay_capacity)
     
     episode_rewards = []
     
@@ -378,8 +379,8 @@ def train():
         episode_rewards.append(total_reward)
 
         # --- Unrolled BPTT Training ---
-        if len(buffer.buffer) > 10:
-            for _ in range(2):
+        if len(buffer.buffer) > args.warmup_games:
+            for _ in range(args.train_steps_per_game):
                 (
                     obs_batch,
                     act_batch,
@@ -480,6 +481,18 @@ def evaluate_and_record(network, config, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="MuZero (research-grade defaults)")
+    parser.add_argument("--num-games", type=int, default=5_000)
+    parser.add_argument("--num-simulations", type=int, default=100)
+    parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument("--unroll-steps", type=int, default=10)
+    parser.add_argument("--td-steps", type=int, default=10)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--replay-capacity", type=int, default=5_000)
+    parser.add_argument("--warmup-games", type=int, default=20)
+    parser.add_argument("--train-steps-per-game", type=int, default=8)
+    args = parser.parse_args()
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     save_dir = os.path.join(base_dir, "results", "muzero", f"run_{timestamp}")
@@ -488,7 +501,7 @@ if __name__ == '__main__':
     print(f"Saving all results to: {save_dir}")
     print("Starting MuZero training on CartPole-v1...")
     
-    network, rewards, config = train()
+    network, rewards, config = train(args)
     
     model_path = os.path.join(save_dir, "muzero_network.pth")
     torch.save(network.state_dict(), model_path)

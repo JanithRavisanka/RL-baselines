@@ -166,16 +166,16 @@ def preprocess_frame(frame):
 
 def train(args):
     cfg = DreamerConfig(
-        horizon=15,
+        horizon=args.horizon,
         gamma=0.997,
         lambda_=0.95,
-        world_lr=3e-4,
-        actor_lr=1e-4,
-        value_lr=1e-4,
+        world_lr=args.world_lr,
+        actor_lr=args.actor_lr,
+        value_lr=args.value_lr,
         kl_scale=1.0,
         free_nats=1.0,
-        batch_size=16,
-        seq_len=50,
+        batch_size=args.batch_size,
+        seq_len=args.seq_len,
         latent_dim=32 * 32,
         deter_dim=600,
         atari=True,
@@ -189,7 +189,7 @@ def train(args):
     world_opt = optim.Adam(world_params, lr=cfg.world_lr, eps=1e-5)
     actor_opt = optim.Adam(model.actor.parameters(), lr=cfg.actor_lr, eps=1e-5)
     value_opt = optim.Adam(model.value.parameters(), lr=cfg.value_lr, eps=1e-5)
-    replay = ReplayBuffer()
+    replay = ReplayBuffer(capacity=args.replay_capacity)
     world_losses, actor_losses, value_losses = [], [], []
 
     obs, _ = env.reset()
@@ -365,8 +365,15 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
 def build_args():
     p = argparse.ArgumentParser(description="Dreamer V2 (paper architecture) in PyTorch")
     p.add_argument("--env", type=str, default="ALE/Breakout-v5")
-    p.add_argument("--prefill", type=int, default=20000)
-    p.add_argument("--updates", type=int, default=3000)
+    p.add_argument("--prefill", type=int, default=100_000)
+    p.add_argument("--updates", type=int, default=30_000)
+    p.add_argument("--batch-size", type=int, default=32)
+    p.add_argument("--seq-len", type=int, default=64)
+    p.add_argument("--horizon", type=int, default=15)
+    p.add_argument("--replay-capacity", type=int, default=1_000_000)
+    p.add_argument("--world-lr", type=float, default=3e-4)
+    p.add_argument("--actor-lr", type=float, default=1e-4)
+    p.add_argument("--value-lr", type=float, default=1e-4)
     return p.parse_args()
 
 

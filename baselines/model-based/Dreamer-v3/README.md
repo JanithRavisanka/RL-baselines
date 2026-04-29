@@ -1,53 +1,56 @@
-# Dreamer V3 Baseline (`dreamer_v3.py`)
+# Dreamer V3
 
-PyTorch implementation of a Dreamer V3-style agent for discrete-action visual environments (default: Atari Breakout via Gymnasium/ALE).
+Dreamer V3-style discrete world-model agent for Atari-like visual environments.
 
 ## Run
 
-From repository root:
+From repo root:
 
 ```bash
 python baselines/model-based/Dreamer-v3/dreamer_v3.py
 ```
 
-With custom arguments:
+Research-style custom run:
 
 ```bash
 python baselines/model-based/Dreamer-v3/dreamer_v3.py \
   --env ALE/Breakout-v5 \
-  --prefill 50000 \
-  --updates 5000 \
-  --batch-size 16 \
-  --seq-len 64
+  --prefill 200000 \
+  --updates 50000 \
+  --batch-size 32 \
+  --seq-len 64 \
+  --horizon 15 \
+  --replay-capacity 2000000 \
+  --world-lr 1e-4 \
+  --actor-lr 3e-5 \
+  --value-lr 3e-5
 ```
 
-## Arguments
+## Inputs / Arguments
 
-- `--env` (str): Gymnasium environment id (must have discrete actions and `rgb_array` rendering).
-- `--prefill` (int): random replay prefill steps before model training.
-- `--updates` (int): number of training updates.
-- `--batch-size` (int): replay batch size (sequence batches).
-- `--seq-len` (int): sequence length used for world-model training.
+- `--env` (default: `ALE/Breakout-v5`)
+- `--prefill` (default: `200000`)
+- `--updates` (default: `50000`)
+- `--batch-size` (default: `32`)
+- `--seq-len` (default: `64`)
+- `--horizon` (default: `15`)
+- `--replay-capacity` (default: `2000000`)
+- `--world-lr` (default: `1e-4`)
+- `--actor-lr` (default: `3e-5`)
+- `--value-lr` (default: `3e-5`)
 
-## Environment Expectations
+## Environment Notes
 
-- Python environment with:
-  - `torch`, `numpy`, `matplotlib`, `imageio`
-  - `gymnasium`, `ale-py`
-- Default config expects Atari registration through ALE and runs with pixel observations.
-- Device selection is automatic: CUDA -> MPS -> CPU.
-- Input frames are resized to `64x64` RGB and stored in replay as `uint8`.
+- Requires: `torch`, `gymnasium`, `ale-py`, `numpy`, `matplotlib`, `imageio`.
+- Device auto-select: CUDA -> MPS -> CPU.
+- Uses `rgb_array` frames resized to `64x64`.
 
 ## Outputs
 
-Each run creates a timestamped directory:
+Each run writes:
 
-- `results/dreamer_v3/run_<YYYYMMDD_HHMMSS>/`
+`results/dreamer_v3/run_<timestamp>/`
 
-Files generated:
-
-- `model.pth`: trained model weights.
-- `training_curve.png`: plot of world/actor/value losses over updates.
-- `dreamer_v3_agent.gif`: evaluation rollout rendered as GIF (if frames were captured).
-
-Console logs include prefill progress, periodic loss reports, save paths, and evaluation reward.
+- `model.pth`
+- `training_curve.png`
+- `dreamer_v3_agent.gif`

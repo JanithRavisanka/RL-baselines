@@ -202,10 +202,10 @@ def train(args):
 
     world_params = list(model.encoder.parameters()) + list(model.rssm.parameters()) + list(model.decoder.parameters())
     world_params += list(model.reward.parameters()) + list(model.cont.parameters())
-    world_opt = optim.Adam(world_params, lr=1e-4, eps=1e-8)
-    actor_opt = optim.Adam(model.actor.parameters(), lr=3e-5, eps=1e-5)
-    value_opt = optim.Adam(model.value.parameters(), lr=3e-5, eps=1e-5)
-    replay = ReplayBuffer()
+    world_opt = optim.Adam(world_params, lr=args.world_lr, eps=1e-8)
+    actor_opt = optim.Adam(model.actor.parameters(), lr=args.actor_lr, eps=1e-5)
+    value_opt = optim.Adam(model.value.parameters(), lr=args.value_lr, eps=1e-5)
+    replay = ReplayBuffer(capacity=args.replay_capacity)
     return_norm = ReturnNormalizer()
     world_losses, actor_losses, value_losses = [], [], []
 
@@ -286,7 +286,7 @@ def train(args):
         # Starting from replay-inferred posterior state, roll forward using RSSM
         # imagination and train actor/value without new environment interaction.
         imag_feats, imag_target, imag_value, logp, entropy = imagine_behavior(
-            model, posts[-1], horizon=15, action_dim=action_dim, gamma=0.997, lambda_=0.95
+            model, posts[-1], horizon=args.horizon, action_dim=action_dim, gamma=0.997, lambda_=0.95
         )
         # Normalize imagined advantages with robust running return scale before
         # policy-gradient weighting, which stabilizes actor updates over training.
@@ -385,10 +385,15 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
 def build_args():
     p = argparse.ArgumentParser(description="Dreamer V3 (paper architecture) in PyTorch")
     p.add_argument("--env", type=str, default="ALE/Breakout-v5")
-    p.add_argument("--prefill", type=int, default=50000)
-    p.add_argument("--updates", type=int, default=5000)
-    p.add_argument("--batch-size", type=int, default=16)
+    p.add_argument("--prefill", type=int, default=200_000)
+    p.add_argument("--updates", type=int, default=50_000)
+    p.add_argument("--batch-size", type=int, default=32)
     p.add_argument("--seq-len", type=int, default=64)
+    p.add_argument("--horizon", type=int, default=15)
+    p.add_argument("--replay-capacity", type=int, default=2_000_000)
+    p.add_argument("--world-lr", type=float, default=1e-4)
+    p.add_argument("--actor-lr", type=float, default=3e-5)
+    p.add_argument("--value-lr", type=float, default=3e-5)
     return p.parse_args()
 
 

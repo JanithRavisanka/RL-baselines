@@ -1,32 +1,57 @@
-# Dreamer V2 Baseline
+# Dreamer V2
 
-PyTorch Dreamer V2-style Atari training script using a discrete RSSM world model and imagined behavior learning.
+Discrete-latent Dreamer baseline for Atari-style tasks.
 
 ## Run
 
 From repo root:
 
 ```bash
-python baselines/model-based/Dreamer-v2/dreamer_v2.py --env ALE/Breakout-v5 --prefill 20000 --updates 3000
+python baselines/model-based/Dreamer-v2/dreamer_v2.py
 ```
 
-## Main arguments
-- `--env` (default: `ALE/Breakout-v5`): Gymnasium Atari env id.
-- `--prefill` (default: `20000`): random steps collected before gradient updates.
-- `--updates` (default: `3000`): number of training updates.
+Research-style custom run:
 
-## Atari environment notes
-- Uses `gymnasium` + `ale_py` with `render_mode="rgb_array"`.
-- Frames are preprocessed to `64x64` and 3 channels.
-- Action space is assumed discrete (`env.action_space.n`).
-- Evaluation includes a Breakout-specific `FIRE` action after reset to start gameplay.
+```bash
+python baselines/model-based/Dreamer-v2/dreamer_v2.py \
+  --env ALE/Breakout-v5 \
+  --prefill 100000 \
+  --updates 30000 \
+  --batch-size 32 \
+  --seq-len 64 \
+  --horizon 15 \
+  --replay-capacity 1000000 \
+  --world-lr 3e-4 \
+  --actor-lr 1e-4 \
+  --value-lr 1e-4
+```
 
-## Outputs generated
-Each run creates a timestamped directory:
+## Inputs / Arguments
 
-- `results/dreamer_v2/run_<timestamp>/model.pth` - trained weights
-- `results/dreamer_v2/run_<timestamp>/training_curve.png` - world/actor/value losses
-- `results/dreamer_v2/run_<timestamp>/dreamer_v2_agent.gif` - evaluation rollout (if frames captured)
+- `--env` (default: `ALE/Breakout-v5`)
+- `--prefill` (default: `100000`)
+- `--updates` (default: `30000`)
+- `--batch-size` (default: `32`)
+- `--seq-len` (default: `64`)
+- `--horizon` (default: `15`)
+- `--replay-capacity` (default: `1000000`)
+- `--world-lr` (default: `3e-4`)
+- `--actor-lr` (default: `1e-4`)
+- `--value-lr` (default: `1e-4`)
 
-The script also prints periodic training losses and final evaluation reward.
+## Environment Notes
+
+- Requires: `torch`, `gymnasium`, `ale-py`, `numpy`, `matplotlib`, `imageio`.
+- Uses `rgb_array` frames; preprocessing resizes to `64x64`.
+- Evaluation uses an initial Breakout `FIRE` action.
+
+## Outputs
+
+Each run writes:
+
+`results/dreamer_v2/run_<timestamp>/`
+
+- `model.pth`
+- `training_curve.png`
+- `dreamer_v2_agent.gif`
 

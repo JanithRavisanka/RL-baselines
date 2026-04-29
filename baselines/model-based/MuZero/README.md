@@ -10,41 +10,40 @@ From repository root:
 python baselines/model-based/MuZero/muzero.py
 ```
 
-Or from this directory:
+Research-style custom run:
 
 ```bash
-python muzero.py
+python baselines/model-based/MuZero/muzero.py \
+  --num-games 5000 \
+  --num-simulations 100 \
+  --batch-size 128 \
+  --unroll-steps 10 \
+  --td-steps 10 \
+  --lr 1e-3 \
+  --replay-capacity 5000 \
+  --warmup-games 20 \
+  --train-steps-per-game 8
 ```
 
-## Key defaults (from code)
+## Inputs / Arguments
 
-- Environment: `CartPole-v1`
-- Network hidden size: `128`
-- Search:
-  - `num_simulations=25`
-  - `pb_c_init=1.25`
-  - `pb_c_base=19652`
-  - root Dirichlet noise: `alpha=0.25`, `eps=0.25`
-- Training:
-  - `discount=0.99`
-  - `td_steps=5`
-  - `unroll_steps=5`
-  - `batch_size=64`
-  - `num_games=200`
-  - optimizer: `Adam(lr=0.002, weight_decay=1e-4)`
-  - update schedule: 2 gradient updates per episode once replay has more than 10 games
-- Replay buffer capacity: `500`
-- Action sampling temperature by episode:
-  - `<50`: `1.0`
-  - `<100`: `0.5`
-  - otherwise: `0.25`
+- `--num-games` (default: `5000`)
+- `--num-simulations` (default: `100`)
+- `--batch-size` (default: `128`)
+- `--unroll-steps` (default: `10`)
+- `--td-steps` (default: `10`)
+- `--lr` (default: `1e-3`)
+- `--replay-capacity` (default: `5000`)
+- `--warmup-games` (default: `20`)
+- `--train-steps-per-game` (default: `8`)
 
-## Inputs and outputs
+Fixed in-code search constants:
+- `pb_c_init=1.25`, `pb_c_base=19652`
+- root Dirichlet: `alpha=0.25`, `eps=0.25`
 
 ## Inputs
 
-- Environment observations from Gym (`obs_dim` inferred from env).
-- Discrete action space size (`action_dim` inferred from env).
+- Environment: `CartPole-v1` (inferred dims from Gymnasium).
 - No external datasets or config files required.
 
 ## Outputs

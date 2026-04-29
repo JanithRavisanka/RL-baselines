@@ -10,6 +10,17 @@ From the repo root:
 python baselines/model-free/DDQN/double_dqn.py
 ```
 
+## Inputs / Arguments
+
+- Script currently has no CLI flags.
+- Core defaults are defined in code:
+  - env: `ALE/Breakout-v5`
+  - `max_frames=500000`
+  - `batch_size=32`
+  - `gamma=0.99`
+  - epsilon schedule: `1.0 -> 0.1` over `250000` frames
+  - target update frequency: every `1000` frames
+
 ## What the script does
 
 - Trains a Double DQN agent on `ALE/Breakout-v5` for up to 500k frames

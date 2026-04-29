@@ -12,25 +12,39 @@ python baselines/model-based/MPC/learned_dynamics_mpc.py
 
 The script auto-selects device (`cuda`, `mps`, or `cpu`) and creates a timestamped results directory.
 
-## Inputs and settings (in code)
+## Inputs / Arguments
 
-Environment and core settings are defined directly in `learned_dynamics_mpc.py`:
+```bash
+python baselines/model-based/MPC/learned_dynamics_mpc.py \
+  --ensemble-size 7 \
+  --seed-steps 10000 \
+  --initial-epochs 300 \
+  --retrain-epochs 30 \
+  --num-episodes 100 \
+  --batch-size 512 \
+  --num-sequences 2048 \
+  --horizon 30 \
+  --cem-iterations 6 \
+  --elite-frac 0.05 \
+  --validation-horizon 10 \
+  --gamma 0.99 \
+  --lr 1e-3
+```
 
-- Environment: `gym.make("Pendulum-v1")`
-- Dynamics ensemble size: `5`
-- Replay buffer capacity: `100000`
-- Seed random transitions: `2000`
-- Initial dynamics training: `epochs=100`, `batch_size=256`
-- Online MPC episodes: `25`
-- Per-episode retraining: `epochs=10`, `batch_size=256`
-- CEM planner:
-  - `num_sequences=512` (training), `1024` (evaluation)
-  - `horizon=20`
-  - `elite_frac=0.1`
-  - `iterations=4`
-  - `gamma=0.99`
-
-No separate config file is required for default execution.
+Defaults:
+- `--ensemble-size 7`
+- `--seed-steps 10000`
+- `--initial-epochs 300`
+- `--retrain-epochs 30`
+- `--num-episodes 100`
+- `--batch-size 512`
+- `--num-sequences 2048`
+- `--horizon 30`
+- `--cem-iterations 6`
+- `--elite-frac 0.05`
+- `--validation-horizon 10`
+- `--gamma 0.99`
+- `--lr 1e-3`
 
 ## Outputs
 
@@ -41,7 +55,7 @@ For each run, files are saved under:
 Expected artifacts:
 
 - `dynamics_ensemble.pth`  
-  Saved list of 5 model `state_dict`s.
+  Saved list of ensemble model `state_dict`s (default ensemble size: 7).
 - `training_curve.png`  
   Episode reward curve for the online MPC phase.
 - `pendulum_mpc_agent.gif`  
@@ -63,4 +77,5 @@ During training, each episode prints:
 ## Notes
 
 - The planner is receding-horizon MPC: it plans over 20 steps but executes only the first action, then replans next step.
+- Default research preset uses horizon 30 (`--horizon 30`).
 - Dynamics are learned in delta-space with normalization for more stable optimization.

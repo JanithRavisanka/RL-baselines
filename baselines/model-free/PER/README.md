@@ -10,6 +10,17 @@ From the repository root:
 python3 baselines/model-free/PER/per_ddqn.py
 ```
 
+## Inputs / Arguments
+
+- Script currently has no CLI flags.
+- Core defaults are defined in code:
+  - env: `ALE/Breakout-v5`
+  - `max_frames=500000`
+  - `batch_size=32`
+  - PER: `alpha=0.6`, `beta_start=0.4` annealed to `1.0`
+  - epsilon schedule: `1.0 -> 0.1` over `250000` frames
+  - target update frequency: every `1000` frames
+
 ## Expected console output
 
 You should see logs similar to:
