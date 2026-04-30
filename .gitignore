@@ -5,3 +5,8 @@ __pycache__/
 .vscode/
 .idea/
 server.txt
+
+# Model weights (saved locally, not tracked)
+results/**/*.pth
+results/**/*.pt
+results/**/*.npy
