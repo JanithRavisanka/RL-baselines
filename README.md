@@ -166,17 +166,55 @@ python play_model.py --algo actor_critic --save-gif results/actor_critic_eval.gi
 - Dyna-Q playback expects a Q-table file (`q_table.npy`).
 - `--device` can be `auto`, `cpu`, or `cuda` (default: `auto`).
 
-## Run All Algorithms (Max 3 At Once)
+## Run All Algorithms
 
-Use the scheduler script to automate running all training scripts with bounded concurrency.
+Use the resource-aware scheduler to run all training scripts in parallel. Instead of a
+flat concurrency cap, it tracks GPU VRAM and CPU slot budgets so lightweight jobs never
+block behind heavy GPU workloads.
 
 ```bash
+# Smart defaults — auto-skips already-completed algorithms
+python run_all_algorithms.py
+
+# Preview the scheduling plan without launching anything
+python run_all_algorithms.py --dry-run
+
+# Force re-run all algorithms (ignore existing results)
+python run_all_algorithms.py --no-skip
+
+# Run only specific algorithms
+python run_all_algorithms.py --only dqn muzero dreamer_v3
+
+# Exclude slow algorithms
+python run_all_algorithms.py --exclude dreamer_v3
+
+# Override GPU budget (e.g., if other processes are using the GPU)
+python run_all_algorithms.py --gpu-budget-mb 10000
+
+# Legacy flat-parallelism mode (backward compatible)
 python run_all_algorithms.py --max-parallel 3
 ```
 
-Optional flags:
+### Scheduler flags
 
-- `--poll-seconds 5` to control completion check interval
+| Flag | Default | Description |
+|---|---|---|
+| `--gpu-budget-mb` | `14000` | Total GPU VRAM budget in MB |
+| `--cpu-slots` | `10` | Max CPU weight slots to use concurrently |
+| `--poll-seconds` | `10` | Job completion polling interval |
+| `--no-skip` | off | Force re-run even if results exist |
+| `--dry-run` | off | Print scheduling plan without running |
+| `--only ALGO [...]` | all | Run only the listed algorithm(s) |
+| `--exclude ALGO [...]` | none | Skip the listed algorithm(s) |
+| `--max-parallel N` | — | Legacy mode: flat slot cap, ignores budgets |
+
+### How it works
+
+Each algorithm is annotated with its GPU VRAM estimate and CPU weight. The scheduler
+launches jobs whenever the remaining budget allows, preferring shortest-estimated-duration
+jobs first. CPU-only algorithms (e.g., `actor_critic`, `dyna_q`) run freely alongside
+GPU jobs without consuming GPU budget. Already-completed algorithms are auto-detected
+and skipped.
 
 Logs are saved to:
 
