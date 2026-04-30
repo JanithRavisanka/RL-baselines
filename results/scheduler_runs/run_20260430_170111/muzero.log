@@ -1,0 +1,14 @@
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/muzero/run_20260430_170116
+Starting MuZero training on CartPole-v1...
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MuZero/muzero.py", line 510, in <module>
+    network, rewards, config = train(args)
+                               ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MuZero/muzero.py", line 364, in train
+    policy, root_value = run_mctx(config, network, obs)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MuZero/muzero.py", line 195, in run_mctx
+    action_tensor = torch.tensor([action], dtype=torch.long, device=device)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

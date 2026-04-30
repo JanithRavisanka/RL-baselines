@@ -1,0 +1,172 @@
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/mpc/run_20260430_115539
+Collecting seed dataset with random actions...
+Training initial Dynamics Model...
+Starting MPC Control loop...
+Episode 1/100 | Total Reward: -220.64
+   -> Dynamics Model retrained. One-step MSE: 0.00160 | 5-step rollout MSE: 0.00721
+Episode 2/100 | Total Reward: -116.94
+   -> Dynamics Model retrained. One-step MSE: 0.00160 | 5-step rollout MSE: 0.00709
+Episode 3/100 | Total Reward: -122.68
+   -> Dynamics Model retrained. One-step MSE: 0.00142 | 5-step rollout MSE: 0.00449
+Episode 4/100 | Total Reward: -117.35
+   -> Dynamics Model retrained. One-step MSE: 0.00145 | 5-step rollout MSE: 0.00461
+Episode 5/100 | Total Reward: -125.95
+   -> Dynamics Model retrained. One-step MSE: 0.00136 | 5-step rollout MSE: 0.00391
+Episode 6/100 | Total Reward: -232.72
+   -> Dynamics Model retrained. One-step MSE: 0.00121 | 5-step rollout MSE: 0.00402
+Episode 7/100 | Total Reward: -128.65
+   -> Dynamics Model retrained. One-step MSE: 0.00119 | 5-step rollout MSE: 0.00409
+Episode 8/100 | Total Reward: -123.63
+   -> Dynamics Model retrained. One-step MSE: 0.00114 | 5-step rollout MSE: 0.00220
+Episode 9/100 | Total Reward: -123.22
+   -> Dynamics Model retrained. One-step MSE: 0.00113 | 5-step rollout MSE: 0.00254
+Episode 10/100 | Total Reward: -126.67
+   -> Dynamics Model retrained. One-step MSE: 0.00106 | 5-step rollout MSE: 0.00293
+Episode 11/100 | Total Reward: -372.59
+   -> Dynamics Model retrained. One-step MSE: 0.00099 | 5-step rollout MSE: 0.00458
+Episode 12/100 | Total Reward: -1.05
+   -> Dynamics Model retrained. One-step MSE: 0.00105 | 5-step rollout MSE: 0.00500
+Episode 13/100 | Total Reward: -119.20
+   -> Dynamics Model retrained. One-step MSE: 0.00096 | 5-step rollout MSE: 0.00159
+Episode 14/100 | Total Reward: -122.41
+   -> Dynamics Model retrained. One-step MSE: 0.00098 | 5-step rollout MSE: 0.00218
+Episode 15/100 | Total Reward: -118.12
+   -> Dynamics Model retrained. One-step MSE: 0.00093 | 5-step rollout MSE: 0.00277
+Episode 16/100 | Total Reward: -312.60
+   -> Dynamics Model retrained. One-step MSE: 0.00092 | 5-step rollout MSE: 0.00106
+Episode 17/100 | Total Reward: -245.58
+   -> Dynamics Model retrained. One-step MSE: 0.00088 | 5-step rollout MSE: 0.00181
+Episode 18/100 | Total Reward: -115.94
+   -> Dynamics Model retrained. One-step MSE: 0.00083 | 5-step rollout MSE: 0.00133
+Episode 19/100 | Total Reward: -243.08
+   -> Dynamics Model retrained. One-step MSE: 0.00084 | 5-step rollout MSE: 0.00335
+Episode 20/100 | Total Reward: -0.56
+   -> Dynamics Model retrained. One-step MSE: 0.00087 | 5-step rollout MSE: 0.00171
+Episode 21/100 | Total Reward: -123.20
+   -> Dynamics Model retrained. One-step MSE: 0.00088 | 5-step rollout MSE: 0.00081
+Episode 22/100 | Total Reward: -127.56
+   -> Dynamics Model retrained. One-step MSE: 0.00081 | 5-step rollout MSE: 0.00189
+Episode 23/100 | Total Reward: -292.37
+   -> Dynamics Model retrained. One-step MSE: 0.00078 | 5-step rollout MSE: 0.00177
+Episode 24/100 | Total Reward: -0.86
+   -> Dynamics Model retrained. One-step MSE: 0.00077 | 5-step rollout MSE: 0.00090
+Episode 25/100 | Total Reward: -117.92
+   -> Dynamics Model retrained. One-step MSE: 0.00087 | 5-step rollout MSE: 0.00162
+Episode 26/100 | Total Reward: -114.55
+   -> Dynamics Model retrained. One-step MSE: 0.00077 | 5-step rollout MSE: 0.00099
+Episode 27/100 | Total Reward: -124.93
+   -> Dynamics Model retrained. One-step MSE: 0.00076 | 5-step rollout MSE: 0.00149
+Episode 28/100 | Total Reward: -325.21
+   -> Dynamics Model retrained. One-step MSE: 0.00077 | 5-step rollout MSE: 0.00163
+Episode 29/100 | Total Reward: -364.81
+   -> Dynamics Model retrained. One-step MSE: 0.00069 | 5-step rollout MSE: 0.00108
+Episode 30/100 | Total Reward: -345.78
+   -> Dynamics Model retrained. One-step MSE: 0.00066 | 5-step rollout MSE: 0.00125
+Episode 31/100 | Total Reward: -126.20
+   -> Dynamics Model retrained. One-step MSE: 0.00076 | 5-step rollout MSE: 0.00060
+Episode 32/100 | Total Reward: -221.01
+   -> Dynamics Model retrained. One-step MSE: 0.00068 | 5-step rollout MSE: 0.00213
+Episode 33/100 | Total Reward: -218.74
+   -> Dynamics Model retrained. One-step MSE: 0.00073 | 5-step rollout MSE: 0.00036
+Episode 34/100 | Total Reward: -126.68
+   -> Dynamics Model retrained. One-step MSE: 0.00065 | 5-step rollout MSE: 0.00109
+Episode 35/100 | Total Reward: -115.93
+   -> Dynamics Model retrained. One-step MSE: 0.00067 | 5-step rollout MSE: 0.00071
+Episode 36/100 | Total Reward: -232.14
+   -> Dynamics Model retrained. One-step MSE: 0.00064 | 5-step rollout MSE: 0.00049
+Episode 37/100 | Total Reward: -124.86
+   -> Dynamics Model retrained. One-step MSE: 0.00067 | 5-step rollout MSE: 0.00075
+Episode 38/100 | Total Reward: -124.98
+   -> Dynamics Model retrained. One-step MSE: 0.00065 | 5-step rollout MSE: 0.00157
+Episode 39/100 | Total Reward: -127.57
+   -> Dynamics Model retrained. One-step MSE: 0.00069 | 5-step rollout MSE: 0.00062
+Episode 40/100 | Total Reward: -127.73
+   -> Dynamics Model retrained. One-step MSE: 0.00069 | 5-step rollout MSE: 0.00109
+Episode 41/100 | Total Reward: -239.51
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00076
+Episode 42/100 | Total Reward: -1.29
+   -> Dynamics Model retrained. One-step MSE: 0.00059 | 5-step rollout MSE: 0.00117
+Episode 43/100 | Total Reward: -224.08
+   -> Dynamics Model retrained. One-step MSE: 0.00062 | 5-step rollout MSE: 0.00133
+Episode 44/100 | Total Reward: -116.97
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00164
+Episode 45/100 | Total Reward: -122.91
+   -> Dynamics Model retrained. One-step MSE: 0.00065 | 5-step rollout MSE: 0.00162
+Episode 46/100 | Total Reward: -125.67
+   -> Dynamics Model retrained. One-step MSE: 0.00063 | 5-step rollout MSE: 0.00134
+Episode 47/100 | Total Reward: -319.47
+   -> Dynamics Model retrained. One-step MSE: 0.00061 | 5-step rollout MSE: 0.00064
+Episode 48/100 | Total Reward: -1.20
+   -> Dynamics Model retrained. One-step MSE: 0.00061 | 5-step rollout MSE: 0.00084
+Episode 49/100 | Total Reward: -126.64
+   -> Dynamics Model retrained. One-step MSE: 0.00057 | 5-step rollout MSE: 0.00072
+Episode 50/100 | Total Reward: -123.53
+   -> Dynamics Model retrained. One-step MSE: 0.00066 | 5-step rollout MSE: 0.00071
+Episode 51/100 | Total Reward: -345.95
+   -> Dynamics Model retrained. One-step MSE: 0.00064 | 5-step rollout MSE: 0.00047
+Episode 52/100 | Total Reward: -1.20
+   -> Dynamics Model retrained. One-step MSE: 0.00057 | 5-step rollout MSE: 0.00061
+Episode 53/100 | Total Reward: -3.43
+   -> Dynamics Model retrained. One-step MSE: 0.00061 | 5-step rollout MSE: 0.00072
+Episode 54/100 | Total Reward: -0.50
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00065
+Episode 55/100 | Total Reward: -124.48
+   -> Dynamics Model retrained. One-step MSE: 0.00064 | 5-step rollout MSE: 0.00061
+Episode 56/100 | Total Reward: -121.97
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00072
+Episode 57/100 | Total Reward: -119.98
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00053
+Episode 58/100 | Total Reward: -120.63
+   -> Dynamics Model retrained. One-step MSE: 0.00058 | 5-step rollout MSE: 0.00051
+Episode 59/100 | Total Reward: -0.94
+   -> Dynamics Model retrained. One-step MSE: 0.00061 | 5-step rollout MSE: 0.00122
+Episode 60/100 | Total Reward: -125.89
+   -> Dynamics Model retrained. One-step MSE: 0.00058 | 5-step rollout MSE: 0.00093
+Episode 61/100 | Total Reward: -118.70
+   -> Dynamics Model retrained. One-step MSE: 0.00055 | 5-step rollout MSE: 0.00032
+Episode 62/100 | Total Reward: -0.98
+   -> Dynamics Model retrained. One-step MSE: 0.00055 | 5-step rollout MSE: 0.00061
+Episode 63/100 | Total Reward: -117.18
+   -> Dynamics Model retrained. One-step MSE: 0.00056 | 5-step rollout MSE: 0.00061
+Episode 64/100 | Total Reward: -0.23
+   -> Dynamics Model retrained. One-step MSE: 0.00060 | 5-step rollout MSE: 0.00109
+Episode 65/100 | Total Reward: -115.04
+   -> Dynamics Model retrained. One-step MSE: 0.00053 | 5-step rollout MSE: 0.00056
+Episode 66/100 | Total Reward: -221.29
+   -> Dynamics Model retrained. One-step MSE: 0.00053 | 5-step rollout MSE: 0.00096
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 403, in <module>
+    models, planner, rewards = train(args)
+                               ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 320, in train
+    action = planner.get_action(state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 194, in get_action
+    returns = self.rollout_return(current_state, action_sequences)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 169, in rollout_return
+    next_state_batch = state_batch + self.predict_delta(state_batch, actions_t)
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 157, in predict_delta
+    preds.append(self.normalizer.denorm_delta(model(norm_states, norm_actions)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 40, in forward
+    x = F.relu(self.fc2(x))
+               ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

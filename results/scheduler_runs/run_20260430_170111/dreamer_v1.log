@@ -1,0 +1,29 @@
+Saving all outputs to: /home/administrator/FYP/RL-baselines/results/dreamer_v1/run_20260430_170120
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/Dreamer-v1/dreamer_v1.py", line 467, in <module>
+    model, metrics = train(args)
+                     ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/Dreamer-v1/dreamer_v1.py", line 279, in train
+    nxt, rew, term, trunc, _ = env.step(action)
+                               ^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 392, in step
+    return super().step(action)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/core.py", line 327, in step
+    return self.env.step(action)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 284, in step
+    return self.env.step(action)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/shimmy/dm_control_compatibility.py", line 128, in step
+    timestep = self._env.step(action)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/dm_control/rl/control.py", line 106, in step
+    self._physics.step(self._n_sub_steps)
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/dm_control/mujoco/engine.py", line 172, in step
+    with self.check_invalid_state():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/contextlib.py", line 301, in helper
+    return _GeneratorContextManager(func, args, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

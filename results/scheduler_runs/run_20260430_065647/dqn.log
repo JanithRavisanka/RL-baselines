@@ -1,0 +1,32 @@
+A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138)
+[Powered by Stella]
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/dqn/run_20260430_065652
+Starting DQN Training for 500000 frames...
+Frame: 2000/500000 | Epsilon: 0.99 | Avg Reward (Last 20): 0.40
+Frame: 4000/500000 | Epsilon: 0.99 | Avg Reward (Last 20): 0.45
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/DQN/dqn.py", line 302, in <module>
+    model, rewards = train()
+                     ^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/DQN/dqn.py", line 177, in train
+    state, _ = env.reset()
+               ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/stateful_observation.py", line 444, in reset
+    obs, info = self.env.reset(seed=seed, options=options)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/atari_preprocessing.py", line 191, in reset
+    _, reset_info = self.env.reset(seed=seed, options=options)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 399, in reset
+    return super().reset(seed=seed, options=options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/core.py", line 333, in reset
+    return self.env.reset(seed=seed, options=options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/gymnasium/wrappers/common.py", line 294, in reset
+    return self.env.reset(seed=seed, options=options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/ale_py/env.py", line 244, in reset
+    self.ale.reset_game()
+KeyboardInterrupt

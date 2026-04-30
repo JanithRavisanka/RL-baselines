@@ -1,0 +1,29 @@
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/actor_critic_continuous/run_20260430_170116
+Starting Continuous Actor-Critic training on Pendulum-v1...
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/actor-critic/actor_critic_continuous.py", line 225, in <module>
+    model, rewards = train()
+                     ^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/actor-critic/actor_critic_continuous.py", line 97, in train
+    mu, sigma, state_value = model(state_tensor)
+                             ^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/actor-critic/actor_critic_continuous.py", line 52, in forward
+    sigma = F.softplus(self.sigma_head(x)) + 1e-5 # add small epsilon to prevent 0
+                       ^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

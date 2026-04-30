@@ -1,0 +1,16 @@
+Saving all results to: /home/administrator/FYP/RL-baselines/results/actor_critic/run_20260430_065652
+Starting Actor-Critic training...
+Episode 50/1000 | Average Reward (last 50): 108.14
+Episode 100/1000 | Average Reward (last 50): 277.70
+Episode 150/1000 | Average Reward (last 50): 262.82
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/actor-critic/actor_critic.py", line 225, in <module>
+    model, rewards = train()
+                     ^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/actor-critic/actor_critic.py", line 86, in train
+    action = m.sample()
+             ^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/distributions/categorical.py", line 134, in sample
+    samples_2d = torch.multinomial(probs_2d, sample_shape.numel(), True).T
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
