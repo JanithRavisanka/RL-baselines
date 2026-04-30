@@ -164,7 +164,7 @@ def train(args):
     env.close()
     return agent, episode_rewards, eval_rewards
 
-def plot_rewards(rewards, eval_rewards, save_dir):
+def plot_rewards(rewards, eval_rewards, save_dir, eval_interval):
     plt.figure(figsize=(10, 5))
     plt.plot(rewards, alpha=0.35, label='Exploratory train return')
     plt.title('Dyna-Q Training on CliffWalking-v1')
@@ -176,7 +176,7 @@ def plot_rewards(rewards, eval_rewards, save_dir):
         moving_avg = np.convolve(rewards, np.ones(window)/window, mode='valid')
         plt.plot(range(window-1, len(rewards)), moving_avg, color='red', label='Train moving average (50)')
     if eval_rewards:
-        eval_x = np.arange(50, 50 * (len(eval_rewards) + 1), 50)
+        eval_x = np.arange(eval_interval, eval_interval * (len(eval_rewards) + 1), eval_interval)
         plt.plot(eval_x, eval_rewards, color='green', marker='o', label='Greedy eval average')
     plt.legend()
         
@@ -224,7 +224,7 @@ def evaluate_and_record(agent, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Dyna-Q (research-grade defaults)")
+    parser = argparse.ArgumentParser(description="Dyna-Q tabular baseline")
     parser.add_argument("--num-episodes", type=int, default=100_000)
     parser.add_argument("--planning-steps", type=int, default=100)
     parser.add_argument("--alpha", type=float, default=0.1)
@@ -247,5 +247,5 @@ if __name__ == '__main__':
     np.save(model_path, agent.q_table)
     print(f"Q-table saved to {model_path}")
     
-    plot_rewards(rewards, eval_rewards, save_dir)
+    plot_rewards(rewards, eval_rewards, save_dir, args.eval_interval)
     evaluate_and_record(agent, save_dir)

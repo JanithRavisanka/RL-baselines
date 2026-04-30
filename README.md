@@ -10,9 +10,12 @@ This repository contains multiple model-free and model-based RL algorithm implem
   - Double DQN (`ALE/Breakout-v5`)
   - PER DDQN (`ALE/Breakout-v5`)
 - Model-based:
-  - Dyna-Q (`CliffWalking-v0`)
+  - Dyna-Q (`CliffWalking-v1`)
   - Learned Dynamics MPC (`Pendulum-v1`)
   - MuZero-style implementation (`CartPole-v1`)
+  - Dreamer V1 (`dm_control/walker-walk-v0`)
+  - Dreamer V2 (`ALE/Breakout-v5`)
+  - Dreamer V3 (`ALE/Breakout-v5`)
 
 ## Setup
 
@@ -80,22 +83,22 @@ python baselines/model-based/MPC/learned_dynamics_mpc.py
 python baselines/model-based/MuZero/muzero.py
 ```
 
-- Dreamer V1 (paper-style continuous RSSM):
+- Dreamer V1 (compact paper-oriented continuous RSSM):
 ```bash
 python baselines/model-based/Dreamer-v1/dreamer_v1.py --env dm_control/walker-walk-v0
 ```
 
-- Dreamer V2 (paper-style discrete RSSM):
+- Dreamer V2 (compact paper-oriented discrete RSSM):
 ```bash
 python baselines/model-based/Dreamer-v2/dreamer_v2.py --env ALE/Breakout-v5
 ```
 
-- Dreamer V3 (paper-style world model + continuation head):
+- Dreamer V3 (compact paper-oriented world model + continuation head):
 ```bash
 python baselines/model-based/Dreamer-v3/dreamer_v3.py --env ALE/Breakout-v5
 ```
 
-### Dreamer Dependencies (paper-standard targets)
+### Dreamer Dependencies (target environments)
 
 - For DeepMind Control experiments (Dreamer V1/V2):
 ```bash

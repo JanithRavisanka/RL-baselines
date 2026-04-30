@@ -4,7 +4,7 @@ This document explains the exact pipeline implemented in `learned_dynamics_mpc.p
 
 ## 1) Dynamics ensemble
 
-- Uses **5 separate `DynamicsModel` networks**.
+- Uses a configurable ensemble of separate `DynamicsModel` networks (`--ensemble-size`, default `7`).
 - Each model predicts **normalized delta state** (`next_state - state`) from `(state, action)`.
 - Architecture per model:
   - Input: `state_dim + action_dim`
@@ -26,23 +26,23 @@ It standardizes inputs/targets for model training and denormalizes predicted del
 
 ## 3) Data pipeline and training schedule
 
-- Replay buffer stores `(state, action, next_state)` with capacity `100000`.
-- Seed data: `2000` random transitions from `Pendulum-v1`.
-- Initial model pretraining: `epochs=100`, `batch_size=256`.
-- Online phase: `25` episodes of MPC control.
+- Replay buffer stores `(state, action, next_state, done)` with capacity `100000`.
+- Seed data: `10000` random transitions from `Pendulum-v1`.
+- Initial model pretraining: `epochs=300`, `batch_size=512`.
+- Online phase: `100` episodes of MPC control.
 - After each episode:
   - add collected transitions to replay
-  - retrain dynamics ensemble for `10` epochs (`batch_size=256`)
+  - retrain dynamics ensemble for `30` epochs (`batch_size=512`)
   - log one-step and multi-step errors.
 
 ## 4) CEM planner details
 
 `CEMPlanner` parameters in this script:
 
-- `num_sequences (K) = 512` during training (`1024` at evaluation)
-- `horizon (H) = 20`
-- `elite_frac = 0.1`
-- `iterations = 4`
+- `num_sequences (K) = 2048` during training (evaluation keeps at least `1024` and does not reduce a larger `K`)
+- `horizon (H) = 30`
+- `elite_frac = 0.05`
+- `iterations = 6`
 - `gamma = 0.99`
 
 Per planning step:
@@ -80,7 +80,7 @@ This complements one-step training MSE and better reflects planning-time model q
 
 ## 7) Outputs produced by this pipeline
 
-- Saved ensemble weights (`dynamics_ensemble.pth`)
+- Saved ensemble weights, normalizer statistics, and planner config (`dynamics_ensemble.pth`)
 - Reward curve plot (`training_curve.png`)
 - Evaluation GIF (`pendulum_mpc_agent.gif`)
 

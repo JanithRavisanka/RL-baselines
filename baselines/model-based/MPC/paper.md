@@ -1,4 +1,4 @@
-# Learned Dynamics MPC (Nagabandi/PETS-style)
+# Learned Dynamics MPC (Nagabandi/PETS-inspired deterministic ensemble)
 
 This note summarizes the idea behind model-based control with a learned dynamics model and CEM planning, in the spirit of works such as Nagabandi et al. and PETS.
 
@@ -21,7 +21,7 @@ For a planning horizon `H`, pick an action sequence that maximizes predicted ret
 - Subject to model rollout:
   - `s_{t+k+1} = s_{t+k} + f_theta(s_{t+k}, a_{t+k})`
 
-In PETS-like settings, ensembles are used to reduce model bias and improve robustness during planning.
+This implementation uses a deterministic ensemble to reduce single-model bias during planning. It is PETS-inspired, but it does not implement PETS probabilistic dynamics or trajectory sampling.
 
 ## Planning with CEM
 

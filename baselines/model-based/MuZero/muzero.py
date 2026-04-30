@@ -68,8 +68,12 @@ class MuZeroNetwork(nn.Module):
         return action_one_hot
 
     def normalize_hidden(self, hidden_state):
-        # Min-max normalization or tanh to keep Dynamics stable during unrolling
-        return torch.tanh(hidden_state)
+        # MuZero normalizes latent states after representation and dynamics so
+        # recurrent unrolls stay on a consistent scale for prediction and search.
+        minimum = hidden_state.min(dim=1, keepdim=True).values
+        maximum = hidden_state.max(dim=1, keepdim=True).values
+        scale = (maximum - minimum).clamp_min(1e-5)
+        return (hidden_state - minimum) / scale
 
     def initial_inference(self, obs):
         """h(obs) and f(s_0)"""
@@ -147,7 +151,7 @@ def select_child(config, node, min_max_stats):
     return action, child
 
 
-def run_mctx(config, network, obs):
+def run_mctx(config, network, obs, add_exploration_noise=True):
     """Runs MCTS to build a search tree and returns the improved policy."""
     root = Node(0)
     
@@ -164,10 +168,12 @@ def run_mctx(config, network, obs):
     for a in range(config['action_dim']):
         root.children[a] = Node(policy_probs[a])
         
-    # Add Dirichlet noise only at root to diversify self-play trajectories.
-    noise = np.random.dirichlet([config['dirichlet_alpha']] * config['action_dim'])
-    for a in root.children:
-        root.children[a].prior = root.children[a].prior * (1 - config['dirichlet_eps']) + noise[a] * config['dirichlet_eps']
+    # Add Dirichlet noise only for training/self-play roots. Evaluation should
+    # report the policy implied by the learned model and search, not a noisy root.
+    if add_exploration_noise and config.get("dirichlet_eps", 0.0) > 0.0:
+        noise = np.random.dirichlet([config['dirichlet_alpha']] * config['action_dim'])
+        for a in root.children:
+            root.children[a].prior = root.children[a].prior * (1 - config['dirichlet_eps']) + noise[a] * config['dirichlet_eps']
         
     # 2. Run simulations:
     # selection (PUCT) -> expansion (dynamics step) -> backup (discounted return)
@@ -467,7 +473,7 @@ def evaluate_and_record(network, config, save_dir):
     while not done:
         frames.append(env.render())
         # To act during evaluation, we use MCTS deterministically
-        policy, _ = run_mctx(config, network, obs)
+        policy, _ = run_mctx(config, network, obs, add_exploration_noise=False)
         action = np.argmax(policy)
         
         obs, reward, terminated, truncated, _ = env.step(action)
@@ -481,7 +487,7 @@ def evaluate_and_record(network, config, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="MuZero (research-grade defaults)")
+    parser = argparse.ArgumentParser(description="MuZero compact paper-oriented baseline")
     parser.add_argument("--num-games", type=int, default=5_000)
     parser.add_argument("--num-simulations", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=128)
@@ -504,7 +510,13 @@ if __name__ == '__main__':
     network, rewards, config = train(args)
     
     model_path = os.path.join(save_dir, "muzero_network.pth")
-    torch.save(network.state_dict(), model_path)
+    torch.save(
+        {
+            "model_state_dict": network.state_dict(),
+            "config": config,
+        },
+        model_path,
+    )
     
     plot_rewards(rewards, save_dir)
     evaluate_and_record(network, config, save_dir)

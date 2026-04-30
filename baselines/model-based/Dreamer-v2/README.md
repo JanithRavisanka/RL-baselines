@@ -23,7 +23,9 @@ python baselines/model-based/Dreamer-v2/dreamer_v2.py \
   --replay-capacity 1000000 \
   --world-lr 3e-4 \
   --actor-lr 1e-4 \
-  --value-lr 1e-4
+  --value-lr 1e-4 \
+  --collect-interval 100 \
+  --collect-steps 1000
 ```
 
 ## Inputs / Arguments
@@ -38,12 +40,14 @@ python baselines/model-based/Dreamer-v2/dreamer_v2.py \
 - `--world-lr` (default: `3e-4`)
 - `--actor-lr` (default: `1e-4`)
 - `--value-lr` (default: `1e-4`)
+- `--collect-interval` (default: `100`)
+- `--collect-steps` (default: `1000`)
 
 ## Environment Notes
 
 - Requires: `torch`, `gymnasium`, `ale-py`, `numpy`, `matplotlib`, `imageio`.
 - Uses `rgb_array` frames; preprocessing resizes to `64x64`.
-- Evaluation uses an initial Breakout `FIRE` action.
+- Training collection and evaluation use an initial Breakout `FIRE` action when the environment exposes one.
 
 ## Outputs
 
@@ -54,4 +58,3 @@ Each run writes:
 - `model.pth`
 - `training_curve.png`
 - `dreamer_v2_agent.gif`
-

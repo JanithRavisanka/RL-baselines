@@ -40,10 +40,14 @@ def latest_model_path(results_subdir: str, filename: str) -> Path:
     if not base.exists():
         raise FileNotFoundError(f"Results folder does not exist: {base}")
     run_dirs = sorted([d for d in base.iterdir() if d.is_dir() and d.name.startswith("run_")], reverse=True)
+    filenames = [filename]
+    if results_subdir == "mpc" and filename == "dynamics_ensemble.pth":
+        filenames.append("dynamics_model.pth")
     for run_dir in run_dirs:
-        candidate = run_dir / filename
-        if candidate.exists():
-            return candidate
+        for candidate_name in filenames:
+            candidate = run_dir / candidate_name
+            if candidate.exists():
+                return candidate
     raise FileNotFoundError(f"No '{filename}' found under {base}/run_*")
 
 
@@ -52,11 +56,16 @@ def list_model_paths(results_subdir: str, filename: str):
     if not base.exists():
         return []
     run_dirs = sorted([d for d in base.iterdir() if d.is_dir() and d.name.startswith("run_")], reverse=True)
+    filenames = [filename]
+    if results_subdir == "mpc" and filename == "dynamics_ensemble.pth":
+        filenames.append("dynamics_model.pth")
     models = []
     for run_dir in run_dirs:
-        candidate = run_dir / filename
-        if candidate.exists():
-            models.append(candidate)
+        for candidate_name in filenames:
+            candidate = run_dir / candidate_name
+            if candidate.exists():
+                models.append(candidate)
+                break
     return models
 
 
@@ -141,7 +150,7 @@ def model_file_for_algo(algo: str) -> Tuple[str, str]:
         "ddqn": ("ddqn", "model.pth"),
         "per_ddqn": ("per_ddqn", "model.pth"),
         "dyna_q": ("dyna_q", "q_table.npy"),
-        "mpc": ("mpc", "dynamics_model.pth"),
+        "mpc": ("mpc", "dynamics_ensemble.pth"),
         "muzero": ("muzero", "muzero_network.pth"),
     }
     return mapping[algo]
@@ -196,33 +205,83 @@ def load_runtime(algo: str, checkpoint: Path, device: torch.device, render_mode:
         return {"env": env, "module": module, "model": model, "requires_fire_start": True}
 
     if algo == "dyna_q":
-        env = gym.make("CliffWalking-v0", render_mode=render_mode)
+        env = gym.make("CliffWalking-v1", render_mode=render_mode)
         q_table = np.load(checkpoint)
         return {"env": env, "q_table": q_table}
 
     if algo == "mpc":
         module = load_module("mpc_mod", ROOT / "baselines" / "model-based" / "MPC" / "learned_dynamics_mpc.py")
+        module.device = device
         env = gym.make("Pendulum-v1", render_mode=render_mode)
-        model = module.DynamicsModel(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
-        model.load_state_dict(torch.load(checkpoint, map_location=device))
-        model.eval()
-        planner = module.RandomShootingPlanner(model, env.action_space.shape[0], num_sequences=2000, horizon=15)
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        if isinstance(checkpoint_data, list):
+            model_states = checkpoint_data
+            normalizer_state = None
+            planner_config = {}
+        elif isinstance(checkpoint_data, dict) and "model_state_dicts" in checkpoint_data:
+            model_states = checkpoint_data["model_state_dicts"]
+            normalizer_state = checkpoint_data.get("normalizer")
+            planner_config = checkpoint_data.get("config", {})
+        elif isinstance(checkpoint_data, dict):
+            model_states = [checkpoint_data]
+            normalizer_state = None
+            planner_config = {}
+        else:
+            raise RuntimeError(f"Unsupported MPC checkpoint format: {type(checkpoint_data)}")
+
+        models = [module.DynamicsModel(env.observation_space.shape[0], env.action_space.shape[0]).to(device) for _ in model_states]
+        for model, state_dict in zip(models, model_states):
+            model.load_state_dict(state_dict)
+            model.eval()
+
+        normalizer = module.TransitionNormalizer(env.observation_space.shape[0], env.action_space.shape[0])
+        if normalizer_state is not None:
+            normalizer.load_state_dict(normalizer_state)
+        else:
+            print("Warning: MPC checkpoint has no saved normalizer; planning may be inaccurate. Retrain to save dynamics_ensemble.pth.")
+
+        planner = module.CEMPlanner(
+            models,
+            normalizer,
+            env.action_space.shape[0],
+            env.action_space.low,
+            env.action_space.high,
+            num_sequences=planner_config.get("num_sequences", 2000),
+            horizon=planner_config.get("horizon", 30),
+            elite_frac=planner_config.get("elite_frac", 0.05),
+            iterations=planner_config.get("cem_iterations", 6),
+            gamma=planner_config.get("gamma", 0.99),
+        )
         return {"env": env, "planner": planner}
 
     if algo == "muzero":
         module = load_module("muzero_mod", ROOT / "baselines" / "model-based" / "MuZero" / "muzero.py")
+        module.device = device
         env = gym.make("CartPole-v1", render_mode=render_mode)
         network = module.MuZeroNetwork(env.observation_space.shape[0], env.action_space.n).to(device)
-        network.load_state_dict(torch.load(checkpoint, map_location=device))
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        if isinstance(checkpoint_data, dict) and "model_state_dict" in checkpoint_data:
+            state_dict = checkpoint_data["model_state_dict"]
+            saved_config = checkpoint_data.get("config", {})
+        else:
+            state_dict = checkpoint_data
+            saved_config = {}
+        network.load_state_dict(state_dict)
         network.eval()
         config = {
             "action_dim": env.action_space.n,
             "num_simulations": 25,
             "discount": 0.99,
             "pb_c_init": 1.25,
+            "pb_c_base": 19652,
             "dirichlet_alpha": 0.25,
             "dirichlet_eps": 0.0,
         }
+        for key in ("num_simulations", "discount", "pb_c_init", "pb_c_base", "dirichlet_alpha"):
+            if key in saved_config:
+                config[key] = saved_config[key]
+        config["action_dim"] = env.action_space.n
+        config["dirichlet_eps"] = 0.0
         return {"env": env, "module": module, "network": network, "config": config}
 
     raise ValueError(f"Unsupported algorithm: {algo}")
@@ -254,7 +313,12 @@ def select_action(algo: str, state: np.ndarray, runtime: Dict[str, Any], device:
             return runtime["planner"].get_action(state)
 
         if algo == "muzero":
-            policy, _ = runtime["module"].run_mctx(runtime["config"], runtime["network"], state)
+            policy, _ = runtime["module"].run_mctx(
+                runtime["config"],
+                runtime["network"],
+                state,
+                add_exploration_noise=False,
+            )
             return int(np.argmax(policy))
 
     raise ValueError(f"Unsupported algorithm: {algo}")

@@ -23,7 +23,9 @@ python baselines/model-based/Dreamer-v1/dreamer_v1.py \
   --replay-capacity 500000 \
   --world-lr 6e-4 \
   --actor-lr 8e-5 \
-  --value-lr 8e-5
+  --value-lr 8e-5 \
+  --collect-interval 100 \
+  --collect-steps 1000
 ```
 
 ## Inputs / Arguments
@@ -38,6 +40,8 @@ python baselines/model-based/Dreamer-v1/dreamer_v1.py \
 - `--world-lr` (default: `6e-4`)
 - `--actor-lr` (default: `8e-5`)
 - `--value-lr` (default: `8e-5`)
+- `--collect-interval` (default: `100`)
+- `--collect-steps` (default: `1000`)
 
 ## Environment Notes
 

@@ -3,6 +3,6 @@ gymnasium
 ale-py
 shimmy
 dm-control
-numpy
+numpy>=1.26,<2
 matplotlib
 imageio

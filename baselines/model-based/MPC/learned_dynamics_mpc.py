@@ -47,15 +47,16 @@ class ReplayBuffer:
         self.buffer = []
         self.position = 0
 
-    def push(self, state, action, next_state):
+    def push(self, state, action, next_state, done=False):
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
-        self.buffer[self.position] = (state, action, next_state)
+        self.buffer[self.position] = (state, action, next_state, done)
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
-        state, action, next_state = map(np.stack, zip(*batch))
+        state, action, next_state, _ = zip(*batch)
+        state, action, next_state = map(np.stack, (state, action, next_state))
         return state, action, next_state
 
     def __len__(self):
@@ -75,16 +76,17 @@ class TransitionNormalizer:
     def update(self, buffer):
         # Fit running dataset statistics from replay.
         # Normalized inputs/targets make dynamics optimization better conditioned.
-        states, actions, next_states = map(np.stack, zip(*buffer.buffer))
+        states, actions, next_states, _ = zip(*buffer.buffer)
+        states, actions, next_states = map(np.stack, (states, actions, next_states))
         states_t = torch.FloatTensor(states).to(device)
         actions_t = torch.FloatTensor(actions).to(device)
         deltas_t = torch.FloatTensor(next_states - states).to(device)
         self.state_mean = states_t.mean(0)
-        self.state_std = states_t.std(0).clamp_min(self.eps)
+        self.state_std = states_t.std(0, unbiased=False).clamp_min(self.eps)
         self.action_mean = actions_t.mean(0)
-        self.action_std = actions_t.std(0).clamp_min(self.eps)
+        self.action_std = actions_t.std(0, unbiased=False).clamp_min(self.eps)
         self.delta_mean = deltas_t.mean(0)
-        self.delta_std = deltas_t.std(0).clamp_min(self.eps)
+        self.delta_std = deltas_t.std(0, unbiased=False).clamp_min(self.eps)
 
     def inputs(self, states, actions):
         return (states - self.state_mean) / self.state_std, (actions - self.action_mean) / self.action_std
@@ -94,6 +96,24 @@ class TransitionNormalizer:
 
     def denorm_delta(self, deltas):
         return deltas * self.delta_std + self.delta_mean
+
+    def state_dict(self):
+        return {
+            "state_mean": self.state_mean.detach().cpu(),
+            "state_std": self.state_std.detach().cpu(),
+            "action_mean": self.action_mean.detach().cpu(),
+            "action_std": self.action_std.detach().cpu(),
+            "delta_mean": self.delta_mean.detach().cpu(),
+            "delta_std": self.delta_std.detach().cpu(),
+        }
+
+    def load_state_dict(self, state):
+        self.state_mean = state["state_mean"].to(device)
+        self.state_std = state["state_std"].to(device)
+        self.action_mean = state["action_mean"].to(device)
+        self.action_std = state["action_std"].to(device)
+        self.delta_mean = state["delta_mean"].to(device)
+        self.delta_std = state["delta_std"].to(device)
 
 def pendulum_reward_fn(state, action):
     """
@@ -175,7 +195,7 @@ class CEMPlanner:
                 elite_idx = torch.topk(returns, elite_count).indices
                 elites = action_sequences[:, elite_idx]
                 mean = elites.mean(dim=1)
-                std = elites.std(dim=1).clamp_min(0.05)
+                std = elites.std(dim=1, unbiased=False).clamp_min(0.05)
                 best_sequence = action_sequences[:, torch.argmax(returns)]
 
             best_first_action = best_sequence[0].cpu().numpy()
@@ -191,19 +211,22 @@ def train_dynamics_model(models, optimizers, normalizer, buffer, batch_size=256,
     total_loss = 0
     
     for _ in range(epochs):
-        states, actions, next_states = buffer.sample(batch_size)
-        states_t = torch.FloatTensor(states).to(device)
-        actions_t = torch.FloatTensor(actions).to(device)
-        next_states_t = torch.FloatTensor(next_states).to(device)
-        true_deltas = next_states_t - states_t
-
-        # Train in normalized delta-space:
-        # model predicts standardized (s_{t+1} - s_t), then denormalization is only
-        # needed for rollout/planning time.
-        norm_states, norm_actions = normalizer.inputs(states_t, actions_t)
-        target_deltas = normalizer.deltas(true_deltas)
         loss = 0.0
         for model, optimizer in zip(models, optimizers):
+            # Bootstrap each ensemble member with its own minibatch. Training all
+            # members on identical batches reduces ensemble diversity and weakens
+            # the uncertainty signal that MPC relies on.
+            states, actions, next_states = buffer.sample(batch_size)
+            states_t = torch.FloatTensor(states).to(device)
+            actions_t = torch.FloatTensor(actions).to(device)
+            next_states_t = torch.FloatTensor(next_states).to(device)
+            true_deltas = next_states_t - states_t
+
+            # Train in normalized delta-space:
+            # model predicts standardized (s_{t+1} - s_t), then denormalization is
+            # only needed for rollout/planning time.
+            norm_states, norm_actions = normalizer.inputs(states_t, actions_t)
+            target_deltas = normalizer.deltas(true_deltas)
             pred_deltas = model(norm_states, norm_actions)
             model_loss = F.mse_loss(pred_deltas, target_deltas)
             optimizer.zero_grad()
@@ -230,6 +253,8 @@ def validate_multistep(models, normalizer, buffer, horizon=5, samples=256):
     max_start = max(0, len(buffer.buffer) - horizon)
     for _ in range(min(samples, max_start)):
         start = random.randint(0, max_start - 1)
+        if any(buffer.buffer[start + t][3] for t in range(max(horizon - 1, 0))):
+            continue
         state = torch.FloatTensor(buffer.buffer[start][0]).unsqueeze(0).to(device)
         with torch.no_grad():
             pred = state.clone()
@@ -258,7 +283,7 @@ def train(args):
     for _ in range(args.seed_steps):
         action = env.action_space.sample()
         next_state, _, terminated, truncated, _ = env.step(action)
-        buffer.push(state, action, next_state)
+        buffer.push(state, action, next_state, terminated or truncated)
         
         if terminated or truncated:
             state, _ = env.reset()
@@ -297,7 +322,7 @@ def train(args):
             done = terminated or truncated
             
             # Record the new transition (Data Aggregation)
-            buffer.push(state, action, next_state)
+            buffer.push(state, action, next_state, done)
             
             state = next_state
             total_reward += reward
@@ -335,8 +360,9 @@ def evaluate_and_record(planner, save_dir):
     done = False
     total_reward = 0
     
-    # We increase sequences during evaluation for even better planning!
-    planner.K = 1024
+    # Keep evaluation planning at least as strong as the lightweight playback
+    # setting without reducing a larger training-time CEM population.
+    planner.K = max(planner.K, 1024)
     
     while not done:
         frames.append(env.render())
@@ -352,7 +378,7 @@ def evaluate_and_record(planner, save_dir):
     print("Saved successfully!")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Learned Dynamics MPC (research-grade defaults)")
+    parser = argparse.ArgumentParser(description="Learned Dynamics MPC (compact PETS-inspired deterministic ensemble)")
     parser.add_argument("--ensemble-size", type=int, default=7)
     parser.add_argument("--seed-steps", type=int, default=10_000)
     parser.add_argument("--initial-epochs", type=int, default=300)
@@ -377,7 +403,21 @@ if __name__ == '__main__':
     models, planner, rewards = train(args)
     
     model_path = os.path.join(save_dir, "dynamics_ensemble.pth")
-    torch.save([model.state_dict() for model in models], model_path)
+    torch.save(
+        {
+            "model_state_dicts": [model.state_dict() for model in models],
+            "normalizer": planner.normalizer.state_dict(),
+            "config": {
+                "ensemble_size": args.ensemble_size,
+                "num_sequences": args.num_sequences,
+                "horizon": args.horizon,
+                "cem_iterations": args.cem_iterations,
+                "elite_frac": args.elite_frac,
+                "gamma": args.gamma,
+            },
+        },
+        model_path,
+    )
     print(f"Dynamics ensemble saved to {model_path}")
     
     plot_rewards(rewards, save_dir)

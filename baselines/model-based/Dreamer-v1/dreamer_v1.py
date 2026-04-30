@@ -29,6 +29,7 @@ from dreamer_common import (
     MLPHead,
     free_nats_loss,
     lambda_return,
+    sample_state_batch,
 )
 
 
@@ -46,27 +47,41 @@ class ReplayBuffer:
         self.act = deque(maxlen=capacity)
         self.rew = deque(maxlen=capacity)
         self.done = deque(maxlen=capacity)
+        self.next_obs = deque(maxlen=capacity)
 
-    def add(self, o, a, r, d):
+    def add(self, o, a, r, d, next_o):
         self.obs.append(o)
         self.act.append(a)
         self.rew.append(r)
         self.done.append(d)
+        self.next_obs.append(next_o)
 
     def __len__(self):
         return len(self.obs)
 
     def sample(self, batch, seq):
-        max_i = len(self.obs) - seq - 1
-        idx = np.random.randint(0, max_i, size=batch)
-        obs, act, rew, done = [], [], [], []
-        for i in idx:
-            obs.append(np.stack([self.obs[i + t] for t in range(seq + 1)], axis=0))
+        max_i = len(self.obs) - seq
+        if max_i < 0:
+            raise ValueError(f"Replay has {len(self.obs)} transitions, need at least {seq}.")
+        obs, next_obs, act, rew, done = [], [], [], [], []
+        for _ in range(batch):
+            for _attempt in range(1000):
+                i = np.random.randint(0, max_i + 1)
+                if not any(self.done[i + t] for t in range(max(seq - 1, 0))):
+                    break
+            else:
+                raise RuntimeError(
+                    "Could not sample a sequence without crossing an episode boundary. "
+                    "Collect longer episodes or reduce --seq-len."
+                )
+            obs.append(np.stack([self.obs[i + t] for t in range(seq)], axis=0))
+            next_obs.append(np.stack([self.next_obs[i + t] for t in range(seq)], axis=0))
             act.append(np.stack([self.act[i + t] for t in range(seq)], axis=0))
             rew.append(np.stack([self.rew[i + t] for t in range(seq)], axis=0))
             done.append(np.stack([self.done[i + t] for t in range(seq)], axis=0))
         return (
             torch.tensor(np.array(obs), dtype=torch.uint8),
+            torch.tensor(np.array(next_obs), dtype=torch.uint8),
             torch.tensor(np.array(act), dtype=torch.float32),
             torch.tensor(np.array(rew), dtype=torch.float32),
             torch.tensor(np.array(done), dtype=torch.float32),
@@ -83,6 +98,7 @@ class DreamerV1(nn.Module):
         latent_dim = 200 + 30
         self.decoder = ConvDecoder(out_channels=3, depth=32, emb=latent_dim)
         self.reward = MLPHead(latent_dim, 1, hidden=200, layers=2)
+        self.cont = MLPHead(latent_dim, 1, hidden=200, layers=2)
         self.value = MLPHead(latent_dim, 1, hidden=200, layers=3)
         self.actor = MLPHead(latent_dim, action_dim * 2, hidden=200, layers=4)
 
@@ -92,20 +108,30 @@ class DreamerV1(nn.Module):
     def actor_dist(self, feat):
         mean, std_logits = torch.chunk(self.actor(feat), 2, dim=-1)
         std = F.softplus(std_logits + 0.54) + 0.1
-        return torch.distributions.Normal(torch.tanh(mean), std)
+        return TanhNormal(mean, std)
+
+
+class TanhNormal:
+    """Small wrapper for Dreamer-style bounded continuous actions."""
+
+    def __init__(self, mean, std):
+        self.base = torch.distributions.Normal(mean, std)
+        self.mean = torch.tanh(mean)
+
+    def rsample(self):
+        return torch.tanh(self.base.rsample())
+
+    def sample(self):
+        return torch.tanh(self.base.sample())
+
+    def entropy(self):
+        # Exact transformed entropy needs the tanh Jacobian. The base entropy is
+        # used as a stable exploration proxy, matching the previous loss shape.
+        return self.base.entropy()
 
 
 def detach_state(state):
     return {k: v.detach() for k, v in state.items()}
-
-
-def mask_state(state, done):
-    # `done` is [B]; convert to [B, 1] so it broadcasts across latent dims.
-    # Multiplying by (1 - done) resets latent carry-over exactly at episode
-    # boundaries, preventing the RSSM from learning impossible cross-episode
-    # transitions in sequence chunks sampled from replay.
-    alive = (1.0 - done).unsqueeze(-1)
-    return {k: v * alive for k, v in state.items()}
 
 
 def imagine_behavior(model, start, horizon, gamma, lambda_):
@@ -136,15 +162,13 @@ def imagine_behavior(model, start, horizon, gamma, lambda_):
     for _ in range(horizon):
         feat = model.feat(state)
         dist = model.actor_dist(feat)
-        action = torch.clamp(dist.rsample(), -1.0, 1.0)
+        action = dist.rsample()
         state = model.rssm.imagine_step(state, action)
         imag_feat = model.feat(state)
         imag_feats.append(imag_feat)
         rewards.append(model.reward(imag_feat).squeeze(-1))
         values.append(model.value(imag_feat).squeeze(-1))
-        # Constant continuation here corresponds to no terminal mask inside
-        # imagination. This matches the standard fixed-horizon Dreamer objective.
-        discounts.append(torch.full_like(rewards[-1], gamma))
+        discounts.append(torch.sigmoid(model.cont(imag_feat).squeeze(-1)) * gamma)
         entropies.append(dist.entropy().sum(-1))
 
     imag_feats = torch.stack(imag_feats, 0)
@@ -178,6 +202,47 @@ def to_pixel_observation(env, obs):
     return preprocess_frame(rendered)
 
 
+def collect_policy_data(env, model, replay, steps, dev):
+    obs, _ = env.reset()
+    obs = to_pixel_observation(env, obs)
+    state = model.rssm.init_state(batch=1, device=dev)
+    prev_action = torch.zeros(1, env.action_space.shape[0], device=dev)
+    was_training = model.training
+    model.eval()
+    total_reward = 0.0
+    episodes = 0
+
+    with torch.no_grad():
+        for _ in range(steps):
+            obs_t = torch.tensor(obs, dtype=torch.uint8, device=dev).unsqueeze(0)
+            embed = model.encoder(obs_t)
+            post, _ = model.rssm.observe_step(state, prev_action, embed)
+            feat = model.feat(post)
+            dist = model.actor_dist(feat)
+            action = dist.sample()
+            action_np = action.squeeze(0).cpu().numpy()
+            nxt, rew, term, trunc, _ = env.step(action_np)
+            done = term or trunc
+            next_obs = to_pixel_observation(env, nxt)
+            replay.add(obs, action_np, rew, float(done), next_obs)
+            total_reward += rew
+
+            if done:
+                episodes += 1
+                obs, _ = env.reset()
+                obs = to_pixel_observation(env, obs)
+                state = model.rssm.init_state(batch=1, device=dev)
+                prev_action = torch.zeros(1, env.action_space.shape[0], device=dev)
+            else:
+                obs = next_obs
+                state = post
+                prev_action = action
+
+    if was_training:
+        model.train()
+    return total_reward, episodes
+
+
 def train(args):
     cfg = DreamerConfig(
         horizon=args.horizon,
@@ -197,7 +262,8 @@ def train(args):
     env = gym.make(args.env, render_mode="rgb_array")
     action_dim = env.action_space.shape[0]
     model = DreamerV1(action_dim).to(dev)
-    world_params = list(model.encoder.parameters()) + list(model.rssm.parameters()) + list(model.decoder.parameters()) + list(model.reward.parameters())
+    world_params = list(model.encoder.parameters()) + list(model.rssm.parameters()) + list(model.decoder.parameters())
+    world_params += list(model.reward.parameters()) + list(model.cont.parameters())
     world_opt = optim.Adam(world_params, lr=cfg.world_lr)
     actor_opt = optim.Adam(model.actor.parameters(), lr=cfg.actor_lr)
     value_opt = optim.Adam(model.value.parameters(), lr=cfg.value_lr)
@@ -212,33 +278,37 @@ def train(args):
         action = env.action_space.sample()
         nxt, rew, term, trunc, _ = env.step(action)
         done = term or trunc
-        replay.add(obs, action, rew, float(done))
+        next_obs = to_pixel_observation(env, nxt)
+        replay.add(obs, action, rew, float(done), next_obs)
         if done:
             nxt, _ = env.reset()
-        obs = to_pixel_observation(env, nxt)
+            obs = to_pixel_observation(env, nxt)
+        else:
+            obs = next_obs
         if step % 1000 == 0 and step > 0:
             print(f"Prefill: {step}/{args.prefill}")
 
     for update in range(args.updates):
-        obs_b, act_b, rew_b, done_b = replay.sample(cfg.batch_size, cfg.seq_len)
+        obs_b, next_obs_b, act_b, rew_b, done_b = replay.sample(cfg.batch_size, cfg.seq_len)
         obs_b = obs_b.to(dev)
+        next_obs_b = next_obs_b.to(dev)
         act_b = act_b.to(dev)
         rew_b = rew_b.to(dev)
         done_b = done_b.to(dev)
 
         state = model.rssm.init_state(cfg.batch_size, dev)
+        init_embed = model.encoder(obs_b[:, 0])
+        init_action = torch.zeros(cfg.batch_size, action_dim, device=dev)
+        state, _ = model.rssm.observe_step(state, init_action, init_embed)
         posts, priors, feats = [], [], []
-        # World-model training on replay sequences:
-        # - encode each frame to embedding e_t,
-        # - update posterior/prior with RSSM observe step,
-        # - decode/reward-predict from posterior features.
-        #
-        # `done_b[:, t-1]` mask zeroes latent state before consuming transition t
-        # when the previous step ended an episode. This enforces correct Markov
-        # boundaries even though replay slices may contain adjacent episodes.
+        # World-model training on replay transitions:
+        # - infer an initial posterior from obs_t,
+        # - apply action_t and condition the posterior on the true next_obs_t,
+        # - decode/reward-predict from that next-state posterior.
+        # Replay sampling rejects chunks that cross terminal boundaries before the
+        # final transition, so latent carry-over never spans unrelated episodes.
         for t in range(cfg.seq_len):
-            embed = model.encoder(obs_b[:, t])
-            state = mask_state(state, done_b[:, t - 1]) if t > 0 else state
+            embed = model.encoder(next_obs_b[:, t])
             post, prior = model.rssm.observe_step(state, act_b[:, t], embed)
             feat = model.feat(post)
             posts.append(post)
@@ -248,15 +318,18 @@ def train(args):
 
         feats = torch.stack(feats, 0)
         recon = model.decoder(feats.reshape(-1, feats.shape[-1]))
-        target = obs_b[:, 1:].transpose(0, 1).reshape(-1, 3, 64, 64).float() / 255.0
+        target = next_obs_b.transpose(0, 1).reshape(-1, 3, 64, 64).float() / 255.0
         recon_loss = F.mse_loss(torch.sigmoid(recon), target)
         reward_pred = model.reward(feats).squeeze(-1)
         reward_loss = F.mse_loss(reward_pred, rew_b.transpose(0, 1))
+        cont_logits = model.cont(feats).squeeze(-1)
+        cont_target = 1.0 - done_b.transpose(0, 1)
+        cont_loss = F.binary_cross_entropy_with_logits(cont_logits, cont_target)
         # KL per time-step and batch element: KL(q(z_t|h_t,e_t) || p(z_t|h_t)).
         # This is the representation-vs-dynamics consistency term in the ELBO.
         kl = torch.stack([model.rssm.kl(p, r) for p, r in zip(posts, priors)], 0)
         kl_loss = free_nats_loss(kl, cfg.free_nats)
-        world_loss = recon_loss + reward_loss + cfg.kl_scale * kl_loss
+        world_loss = recon_loss + reward_loss + cont_loss + cfg.kl_scale * kl_loss
 
         world_opt.zero_grad()
         world_loss.backward()
@@ -266,8 +339,9 @@ def train(args):
         # Behavior learning phase:
         # actor/value are trained on prior-only imagined trajectories rather than
         # directly on replay states, which is what makes Dreamer model-based.
+        imag_start = sample_state_batch(posts, done_b, cfg.batch_size)
         imag_feats, imag_target, imag_value, entropy = imagine_behavior(
-            model, posts[-1], cfg.horizon, cfg.gamma, cfg.lambda_
+            model, imag_start, cfg.horizon, cfg.gamma, cfg.lambda_
         )
         actor_loss = -(imag_target.mean() + 1e-3 * entropy.mean())
 
@@ -290,6 +364,12 @@ def train(args):
             print(
                 f"Update {update}/{args.updates} | world {world_loss.item():.4f} "
                 f"| actor {actor_loss.item():.4f} | value {value_loss.item():.4f}"
+            )
+        if args.collect_steps > 0 and (update + 1) % args.collect_interval == 0:
+            reward_sum, episodes = collect_policy_data(env, model, replay, args.collect_steps, dev)
+            print(
+                f"Collected {args.collect_steps} policy steps | episodes {episodes} "
+                f"| reward sum {reward_sum:.2f} | replay {len(replay)}"
             )
     env.close()
     return model, {
@@ -340,7 +420,7 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
             dist = model.actor_dist(feat)
             # Deterministic evaluation uses policy mean (no sampling noise),
             # assuming this better reflects converged control behavior.
-            action = torch.clamp(dist.mean, -1.0, 1.0)
+            action = dist.mean
             nxt, rew, term, trunc, _ = env.step(action.squeeze(0).cpu().numpy())
             done = term or trunc
             total_reward += rew
@@ -359,7 +439,7 @@ def evaluate_and_record(model, env_name, save_dir, dev, max_steps=1000):
 
 
 def build_args():
-    p = argparse.ArgumentParser(description="Dreamer V1 (paper architecture) in PyTorch")
+    p = argparse.ArgumentParser(description="Dreamer V1 (compact paper-oriented baseline) in PyTorch")
     p.add_argument("--env", type=str, default="dm_control/walker-walk-v0")
     p.add_argument("--prefill", type=int, default=50_000)
     p.add_argument("--updates", type=int, default=20_000)
@@ -370,6 +450,8 @@ def build_args():
     p.add_argument("--world-lr", type=float, default=6e-4)
     p.add_argument("--actor-lr", type=float, default=8e-5)
     p.add_argument("--value-lr", type=float, default=8e-5)
+    p.add_argument("--collect-interval", type=int, default=100)
+    p.add_argument("--collect-steps", type=int, default=1000)
     return p.parse_args()
 
 

@@ -11,7 +11,7 @@ This file maps the current code to MuZero concepts and calls out where the imple
 - `MuZeroNetwork.prediction_policy` + `MuZeroNetwork.prediction_value`: `hidden_state -> (policy_logits, value)` (`f`).
 - `initial_inference` implements `h` then `f`.
 - `recurrent_inference` implements `g` then `f`.
-- Hidden state normalization uses `tanh` after representation and dynamics transitions.
+- Hidden state normalization uses per-sample min-max scaling after representation and dynamics transitions.
 
 ## Search tree, min-max stats, and PUCT
 
@@ -69,3 +69,7 @@ Compared with the original MuZero (board-game/Atari setups), this file is a comp
   - Discrete one-hot action encoding in dynamics; no continuous-control or action-embedding variants.
 
 Even with these simplifications, the structure still follows MuZero’s core loop: learned latent model + MCTS-generated policy targets + unrolled multi-head training.
+
+## Saved checkpoint
+
+`muzero_network.pth` stores both `model_state_dict` and the training search config. `play_model.py` remains backward-compatible with older raw `state_dict` checkpoints, but new runs preserve the MCTS settings used during training.

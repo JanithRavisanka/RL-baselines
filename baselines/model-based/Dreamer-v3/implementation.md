@@ -17,7 +17,7 @@ In this file, the latent feature for heads is:
 ## Discrete RSSM and Unimix Usage
 
 - RSSM posterior/prior probabilities are produced every sequence step (`observe_step`) and for imagined steps (`imagine_step`).
-- This script applies **unimix** (`mix=0.01`) to categorical probabilities:
+- This script sets RSSM **unimix** (`mix=0.01`) before categorical sampling:
   - during world-model sequence updates (posterior and prior probs),
   - and during imagination transitions.
 - Unimix mixes a small uniform mass into each categorical distribution to avoid overconfident one-hot collapse and improve training stability.
@@ -35,8 +35,8 @@ This keeps regression numerically stable while preserving signed reward informat
 
 Each update samples replay sequences and performs:
 
-1. Encode observations.
-2. RSSM filtering (`observe_step`) with done masking to prevent latent carry-over across episode boundaries.
+1. Infer the initial posterior from the first current observation in the chunk.
+2. Apply each action and condition the posterior on the true next observation for that transition.
 3. Compute losses:
    - reconstruction loss
    - reward loss (symlog regression)
@@ -50,10 +50,10 @@ The implemented world loss is:
 
 ## Imagined Behavior Updates
 
-Behavior learning starts from the latest posterior state from replay and rolls out in latent space (`imagine_behavior`):
+Behavior learning samples nonterminal posterior states from across the replay sequence and rolls out in latent space (`imagine_behavior`):
 
 - Actor samples categorical actions.
-- One-hot actions use straight-through gradients.
+- Sampled one-hot actions are fed to the fixed RSSM rollout.
 - RSSM prior transition predicts next imagined latent.
 - Continuation head produces per-step discount (`sigmoid(cont) * gamma`).
 - Value targets are computed with `lambda_return`.
@@ -61,13 +61,16 @@ Behavior learning starts from the latest posterior state from replay and rolls o
 Then:
 - **Return normalizer** updates 5th/95th running quantile bounds on imagined returns.
 - Advantage is scaled by robust return range (`high - low`).
-- **Actor loss** uses scaled advantage + entropy bonus.
+- **Actor loss** uses a REINFORCE-style scaled advantage + entropy bonus for discrete actions.
 - **Value loss** regresses value head toward imagined lambda-return targets.
 
 ## Replay and Training Flow
 
 - Prefill phase gathers random transitions before training.
+- Replay stores aligned `(obs, action, reward, done, next_obs)` transitions.
+- Sequence sampling rejects chunks that cross episode boundaries before the final transition, so recurrent state is not carried between unrelated episodes.
 - Main training alternates:
   - world-model update from replay
   - actor/value updates from imagination
+- Every `--collect-interval` updates, the current actor collects `--collect-steps` new environment steps into replay.
 - The script stores model checkpoint and plots losses after training, then runs greedy evaluation to produce a GIF.

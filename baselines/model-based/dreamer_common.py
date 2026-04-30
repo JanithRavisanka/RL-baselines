@@ -203,6 +203,7 @@ class DiscreteRSSM(nn.Module):
         self.deter = deter
         self.stoch = stoch
         self.classes = classes
+        self.unimix = 0.0
         self.gru = nn.GRUCell(stoch * classes + action_dim, deter)
         self.prior = MLPHead(deter, stoch * classes, hidden=hidden, layers=2)
         self.post = MLPHead(deter + embed_dim, stoch * classes, hidden=hidden, layers=2)
@@ -217,6 +218,8 @@ class DiscreteRSSM(nn.Module):
         # forward pass uses one-hot sample; backward uses soft probs.
         logits = logits.view(logits.shape[0], self.stoch, self.classes)
         probs = F.softmax(logits, dim=-1)
+        if self.unimix > 0.0:
+            probs = (1.0 - self.unimix) * probs + self.unimix * (1.0 / self.classes)
         sample = F.one_hot(torch.multinomial(probs.view(-1, self.classes), 1).squeeze(-1), self.classes).float()
         sample = sample.view(logits.shape[0], self.stoch, self.classes)
         sample = sample + probs - probs.detach()
@@ -278,6 +281,25 @@ def actor_loss(log_prob, advantage, entropy, entropy_scale=1e-3):
 
 def value_loss(pred, target):
     return F.mse_loss(pred, target.detach())
+
+
+def sample_state_batch(states, done, batch_size):
+    """
+    Sample nonterminal posterior states from a time-major list of RSSM states.
+
+    Dreamer starts imagined rollouts from states inferred from replay. Using only
+    the last state in each replay chunk wastes most posterior states and can start
+    imagination from terminal states. `done[t, b]` marks the transition into
+    `states[t][b]`, so those entries are excluded from behavior starts.
+    """
+    stacked = {key: torch.stack([state[key] for state in states], dim=0) for key in states[0]}
+    flat = {key: value.reshape(-1, *value.shape[2:]) for key, value in stacked.items()}
+    nonterminal = (1.0 - done.transpose(0, 1).reshape(-1)).bool()
+    valid = torch.nonzero(nonterminal, as_tuple=False).squeeze(-1)
+    if valid.numel() == 0:
+        valid = torch.arange(done.numel(), device=done.device)
+    choice = valid[torch.randint(valid.numel(), (batch_size,), device=done.device)]
+    return {key: value[choice] for key, value in flat.items()}
 
 
 @dataclass

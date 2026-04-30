@@ -1,6 +1,6 @@
 # Dreamer V1 Implementation Notes (`dreamer_v1.py` + `dreamer_common.py`)
 
-This implementation follows Dreamer V1 with a **continuous RSSM** and pixel observations resized to `64x64`.
+This compact implementation follows the Dreamer V1 structure with a **continuous RSSM** and pixel observations resized to `64x64`.
 
 ## Module Split
 
@@ -17,45 +17,48 @@ This implementation follows Dreamer V1 with a **continuous RSSM** and pixel obse
 - Heads:
   - decoder (`ConvDecoder`) for reconstruction,
   - reward head (`MLPHead`) for reward prediction,
+  - continuation head (`MLPHead`) for predicted nonterminal discount,
   - value head (`MLPHead`) for critic,
-  - actor head (`MLPHead`) outputting mean/std parameters for a Normal policy.
+  - actor head (`MLPHead`) outputting mean/std parameters for a squashed Normal policy.
 
 Actor distribution details:
-- mean is squashed with `tanh`,
+- actions are sampled with a tanh-squashed Normal wrapper,
 - std uses `softplus(std_logits + 0.54) + 0.1`,
-- sampled actions are clamped to `[-1, 1]`.
+- deterministic evaluation uses the squashed mean.
 
 ## Data + Replay
 
-- Replay stores `(obs, action, reward, done)` and samples sequences:
-  - observations: `seq_len + 1`,
+- Replay stores aligned transitions `(obs, action, reward, done, next_obs)`.
+- Sequence sampling returns current observations and true next observations:
+  - `obs` and `next_obs`: `seq_len`,
   - actions/rewards/dones: `seq_len`.
-- Prefill uses random actions before gradient updates.
+- Sampling rejects chunks that cross an episode boundary before the final transition, so RSSM state does not leak across unrelated episodes.
+- Prefill uses random actions before gradient updates, then training periodically collects fresh policy experience with the current actor.
 - For dm_control-style dict observations, pixels come from `env.render()` through `to_pixel_observation`.
 
 ## World Model Training in Code
 
 For each sampled sequence:
 
-1. Encode each frame.
-2. RSSM `observe_step` computes posterior/prior each step.
-3. Episode boundaries in sequence chunks are handled by `mask_state(state, done_{t-1})`.
-4. Compute losses:
-   - `recon_loss`: MSE between `sigmoid(decoder(feat_t))` and next-frame target,
+1. Infer the initial posterior from `obs[:, 0]` with a zero previous action.
+2. For each transition, apply `action_t` and condition the posterior on the true `next_obs_t`.
+3. Compute losses:
+   - `recon_loss`: MSE between `sigmoid(decoder(feat_{t+1}))` and `next_obs_t`,
    - `reward_loss`: MSE reward head vs replay rewards,
+   - `cont_loss`: BCE continuation head vs `1 - done`,
    - `kl_loss`: per-step `KL(post || prior)` via `rssm.kl`, then `free_nats_loss`.
-5. `world_loss = recon_loss + reward_loss + kl_scale * kl_loss`.
-6. Optimize encoder + RSSM + decoder + reward head with Adam, grad clip `100`.
+4. `world_loss = recon_loss + reward_loss + cont_loss + kl_scale * kl_loss`.
+5. Optimize encoder + RSSM + decoder + reward/continuation heads with Adam, grad clip `100`.
 
 ## Imagined Behavior Learning
 
-`imagine_behavior(...)` does latent rollouts from detached posterior starts:
+`sample_state_batch(...)` picks nonterminal posterior states from across the replay sequence, then `imagine_behavior(...)` does latent rollouts from those detached posterior starts:
 
 - loop horizon steps:
   - sample action from actor at current latent feature,
   - transition with `rssm.imagine_step` (prior-only dynamics),
   - predict imagined reward/value.
-- use constant discount `gamma`,
+- use predicted continuation multiplied by `gamma`,
 - bootstrap final value,
 - compute lambda-returns with shared `lambda_return`.
 
@@ -69,7 +72,7 @@ Then:
 `evaluate_and_record` runs a real episode with:
 
 - online RSSM filtering (`observe_step`) using current frame embedding and previous action,
-- deterministic action selection (`dist.mean`, then clamp),
+- deterministic action selection (`dist.mean`),
 - frame capture via `render_mode="rgb_array"` and GIF export.
 
 This keeps latent state grounded by real observations during eval, while training behavior itself still comes from imagination.

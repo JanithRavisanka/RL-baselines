@@ -55,7 +55,7 @@ For each run, files are saved under:
 Expected artifacts:
 
 - `dynamics_ensemble.pth`  
-  Saved list of ensemble model `state_dict`s (default ensemble size: 7).
+  Saved ensemble model `state_dict`s, dynamics normalizer statistics, and planner config.
 - `training_curve.png`  
   Episode reward curve for the online MPC phase.
 - `pendulum_mpc_agent.gif`  
@@ -76,6 +76,6 @@ During training, each episode prints:
 
 ## Notes
 
-- The planner is receding-horizon MPC: it plans over 20 steps but executes only the first action, then replans next step.
+- The planner is receding-horizon MPC: it plans over `--horizon` steps but executes only the first action, then replans next step.
 - Default research preset uses horizon 30 (`--horizon 30`).
 - Dynamics are learned in delta-space with normalization for more stable optimization.

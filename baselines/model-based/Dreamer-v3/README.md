@@ -23,7 +23,9 @@ python baselines/model-based/Dreamer-v3/dreamer_v3.py \
   --replay-capacity 2000000 \
   --world-lr 1e-4 \
   --actor-lr 3e-5 \
-  --value-lr 3e-5
+  --value-lr 3e-5 \
+  --collect-interval 100 \
+  --collect-steps 1000
 ```
 
 ## Inputs / Arguments
@@ -38,12 +40,15 @@ python baselines/model-based/Dreamer-v3/dreamer_v3.py \
 - `--world-lr` (default: `1e-4`)
 - `--actor-lr` (default: `3e-5`)
 - `--value-lr` (default: `3e-5`)
+- `--collect-interval` (default: `100`)
+- `--collect-steps` (default: `1000`)
 
 ## Environment Notes
 
 - Requires: `torch`, `gymnasium`, `ale-py`, `numpy`, `matplotlib`, `imageio`.
 - Device auto-select: CUDA -> MPS -> CPU.
 - Uses `rgb_array` frames resized to `64x64`.
+- Training collection and evaluation use an initial `FIRE` action when the environment exposes one.
 
 ## Outputs
 
