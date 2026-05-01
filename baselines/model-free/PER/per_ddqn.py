@@ -7,8 +7,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import random
-import imageio
-import matplotlib.pyplot as plt
 import os
 import datetime
 from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
@@ -196,25 +194,28 @@ def train():
     target_network = QNetwork(action_dim).to(device)
     target_network.load_state_dict(q_network.state_dict())
     
-    optimizer = optim.Adam(q_network.parameters(), lr=1e-4)
+    optimizer = optim.RMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, eps=0.01)
     
     # Hyperparameters
-    replay_buffer = PrioritizedReplayBuffer(capacity=50000, alpha=0.6)
+    # Directly storing stacked frames makes the paper's 1M replay buffer very
+    # memory-heavy here; 100k keeps the prioritized replay mechanism practical.
+    replay_buffer = PrioritizedReplayBuffer(capacity=100_000, alpha=0.6)
     batch_size = 32
     gamma = 0.99
     
     epsilon_start = 1.0
     epsilon_end = 0.1
-    epsilon_decay_steps = 250000 
+    epsilon_decay_steps = 1_000_000
     epsilon = epsilon_start
     
     # Beta annealing for Importance Sampling
     beta_start = 0.4
-    beta_frames = 250000
+    beta_frames = 1_000_000
     beta_by_frame = lambda frame_idx: min(1.0, beta_start + frame_idx * (1.0 - beta_start) / beta_frames)
     
-    max_frames = 500000 
-    target_update_frequency = 1000 
+    max_frames = 1_000_000
+    learning_starts = 50_000
+    target_update_frequency = 10_000
     
     frame_idx = 0
     episode_rewards = []
@@ -254,7 +255,7 @@ def train():
         epsilon = max(epsilon_end, epsilon_start - (epsilon_start - epsilon_end) * (frame_idx / epsilon_decay_steps))
         
         # 4. Prioritized Learning
-        if len(replay_buffer) > batch_size:
+        if len(replay_buffer) >= batch_size and frame_idx >= learning_starts:
             # Get annealed beta
             beta = beta_by_frame(frame_idx)
             
@@ -306,6 +307,8 @@ def train():
 
 
 def plot_rewards(rewards, save_dir):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(10, 5))
     plt.plot(rewards, alpha=0.6)
     plt.title('PER DDQN Training on Breakout-v5')
@@ -324,6 +327,8 @@ def plot_rewards(rewards, save_dir):
     print(f"Training curve saved as '{save_path}'")
 
 def evaluate_and_record(model, save_dir):
+    import imageio
+
     filename = os.path.join(save_dir, 'breakout_per_ddqn_agent.gif')
     print(f"Evaluating agent and saving video to {filename}...")
     env = make_env(render_mode='rgb_array')

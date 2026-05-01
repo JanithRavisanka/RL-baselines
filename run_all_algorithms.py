@@ -48,39 +48,60 @@ def build_jobs(repo_root: Path) -> List[Job]:
     return [
         # --- Model-Free ---
         Job(
-            "actor_critic",
-            repo_root / "baselines/model-free/actor-critic/actor_critic.py",
-            gpu_vram_mb=0,       # CPU-only, tiny MLP on CartPole
-            cpu_weight=1,
-            estimated_minutes=2,
+            "a3c",
+            repo_root / "baselines/model-free/A3C/a3c.py",
+            gpu_vram_mb=0,       # A3C is intentionally CPU/multiprocess
+            cpu_weight=4,
+            estimated_minutes=20,
         ),
         Job(
-            "actor_critic_continuous",
-            repo_root / "baselines/model-free/actor-critic/actor_critic_continuous.py",
-            gpu_vram_mb=100,     # small MLP on GPU, Pendulum
+            "ppo",
+            repo_root / "baselines/model-free/PPO/ppo.py",
+            gpu_vram_mb=100,     # small MLP on CartPole
+            cpu_weight=1,
+            estimated_minutes=10,
+        ),
+        Job(
+            "ddpg",
+            repo_root / "baselines/model-free/DDPG/ddpg.py",
+            gpu_vram_mb=150,     # off-policy MLP actor/critic on Pendulum
             cpu_weight=1,
             estimated_minutes=30,
+        ),
+        Job(
+            "td3",
+            repo_root / "baselines/model-free/TD3/td3.py",
+            gpu_vram_mb=150,     # twin critics + actor on Pendulum
+            cpu_weight=1,
+            estimated_minutes=30,
+        ),
+        Job(
+            "sac",
+            repo_root / "baselines/model-free/SAC/sac.py",
+            gpu_vram_mb=200,     # stochastic actor + twin critics on Pendulum
+            cpu_weight=1,
+            estimated_minutes=35,
         ),
         Job(
             "dqn",
             repo_root / "baselines/model-free/DQN/dqn.py",
-            gpu_vram_mb=250,     # CNN on Atari, 500k frames
+            gpu_vram_mb=250,     # CNN on Atari, 1M frames default
             cpu_weight=2,
-            estimated_minutes=30,
+            estimated_minutes=60,
         ),
         Job(
             "ddqn",
             repo_root / "baselines/model-free/DDQN/double_dqn.py",
-            gpu_vram_mb=250,     # CNN on Atari, 500k frames
+            gpu_vram_mb=250,     # CNN on Atari, 1M frames default
             cpu_weight=2,
-            estimated_minutes=30,
+            estimated_minutes=60,
         ),
         Job(
             "per_ddqn",
             repo_root / "baselines/model-free/PER/per_ddqn.py",
-            gpu_vram_mb=250,     # CNN on Atari + SumTree, 500k frames
+            gpu_vram_mb=250,     # CNN on Atari + SumTree, 1M frames default
             cpu_weight=2,
-            estimated_minutes=30,
+            estimated_minutes=75,
         ),
         # --- Model-Based ---
         Job(

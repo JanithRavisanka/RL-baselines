@@ -81,8 +81,11 @@ def choose_from_menu(prompt: str, options: list) -> str:
 
 def interactive_select_algo_and_model() -> Tuple[str, Optional[Path]]:
     algo_choices = [
-        "actor_critic",
-        "actor_critic_continuous",
+        "a3c",
+        "ppo",
+        "ddpg",
+        "td3",
+        "sac",
         "dqn",
         "ddqn",
         "per_ddqn",
@@ -122,8 +125,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--algo",
         required=False,
         choices=[
-            "actor_critic",
-            "actor_critic_continuous",
+            "a3c",
+            "ppo",
+            "ddpg",
+            "td3",
+            "sac",
             "dqn",
             "ddqn",
             "per_ddqn",
@@ -144,8 +150,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 def model_file_for_algo(algo: str) -> Tuple[str, str]:
     mapping = {
-        "actor_critic": ("actor_critic", "model.pth"),
-        "actor_critic_continuous": ("actor_critic_continuous", "model.pth"),
+        "a3c": ("a3c", "model.pth"),
+        "ppo": ("ppo", "model.pth"),
+        "ddpg": ("ddpg", "model.pth"),
+        "td3": ("td3", "model.pth"),
+        "sac": ("sac", "model.pth"),
         "dqn": ("dqn", "model.pth"),
         "ddqn": ("ddqn", "model.pth"),
         "per_ddqn": ("per_ddqn", "model.pth"),
@@ -157,28 +166,76 @@ def model_file_for_algo(algo: str) -> Tuple[str, str]:
 
 
 def load_runtime(algo: str, checkpoint: Path, device: torch.device, render_mode: str):
-    if algo == "actor_critic":
-        module = load_module("actor_critic_mod", ROOT / "baselines" / "model-free" / "actor-critic" / "actor_critic.py")
+    if algo == "a3c":
+        module = load_module("a3c_mod", ROOT / "baselines" / "model-free" / "A3C" / "a3c.py")
         env = gym.make("CartPole-v1", render_mode=render_mode)
-        model = module.ActorCritic(env.observation_space.shape[0], env.action_space.n).to(device)
-        model.load_state_dict(torch.load(checkpoint, map_location=device))
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        config = checkpoint_data.get("config", {}) if isinstance(checkpoint_data, dict) else {}
+        state_dict = checkpoint_data.get("model_state_dict", checkpoint_data) if isinstance(checkpoint_data, dict) else checkpoint_data
+        model = module.ActorCritic(
+            env.observation_space.shape[0],
+            env.action_space.n,
+            config.get("hidden_dim", 128),
+        ).to(device)
+        model.load_state_dict(state_dict)
         model.eval()
         return {"env": env, "module": module, "model": model}
 
-    if algo == "actor_critic_continuous":
-        module = load_module(
-            "actor_critic_cont_mod",
-            ROOT / "baselines" / "model-free" / "actor-critic" / "actor_critic_continuous.py",
-        )
+    if algo == "ppo":
+        module = load_module("ppo_mod", ROOT / "baselines" / "model-free" / "PPO" / "ppo.py")
+        env = gym.make("CartPole-v1", render_mode=render_mode)
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        config = checkpoint_data.get("config", {}) if isinstance(checkpoint_data, dict) else {}
+        state_dict = checkpoint_data.get("model_state_dict", checkpoint_data) if isinstance(checkpoint_data, dict) else checkpoint_data
+        model = module.PPOActorCritic(
+            env.observation_space.shape[0],
+            env.action_space.n,
+            config.get("hidden_dim", 64),
+        ).to(device)
+        model.load_state_dict(state_dict)
+        model.eval()
+        return {"env": env, "module": module, "model": model}
+
+    if algo == "ddpg":
+        module = load_module("ddpg_mod", ROOT / "baselines" / "model-free" / "DDPG" / "ddpg.py")
         env = gym.make("Pendulum-v1", render_mode=render_mode)
-        model = module.ActorCriticContinuous(
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        actor = module.Actor(
             env.observation_space.shape[0],
             env.action_space.shape[0],
             float(env.action_space.high[0]),
         ).to(device)
-        model.load_state_dict(torch.load(checkpoint, map_location=device))
-        model.eval()
-        return {"env": env, "module": module, "model": model}
+        actor.load_state_dict(checkpoint_data["actor_state_dict"])
+        actor.eval()
+        return {"env": env, "module": module, "actor": actor}
+
+    if algo == "td3":
+        module = load_module("td3_mod", ROOT / "baselines" / "model-free" / "TD3" / "td3.py")
+        env = gym.make("Pendulum-v1", render_mode=render_mode)
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        actor = module.Actor(
+            env.observation_space.shape[0],
+            env.action_space.shape[0],
+            float(env.action_space.high[0]),
+        ).to(device)
+        actor.load_state_dict(checkpoint_data["actor_state_dict"])
+        actor.eval()
+        return {"env": env, "module": module, "actor": actor}
+
+    if algo == "sac":
+        module = load_module("sac_mod", ROOT / "baselines" / "model-free" / "SAC" / "sac.py")
+        env = gym.make("Pendulum-v1", render_mode=render_mode)
+        checkpoint_data = torch.load(checkpoint, map_location=device)
+        config = checkpoint_data.get("config", {})
+        actor = module.SquashedGaussianActor(
+            env.observation_space.shape[0],
+            env.action_space.shape[0],
+            float(env.action_space.high[0]),
+            config.get("hidden_dim", 256),
+        ).to(device)
+        actor.load_state_dict(checkpoint_data["actor_state_dict"])
+        actor.eval()
+        return {"env": env, "module": module, "actor": actor}
 
     if algo == "dqn":
         module = load_module("dqn_mod", ROOT / "baselines" / "model-free" / "DQN" / "dqn.py")
@@ -289,16 +346,43 @@ def load_runtime(algo: str, checkpoint: Path, device: torch.device, render_mode:
 
 def select_action(algo: str, state: np.ndarray, runtime: Dict[str, Any], device: torch.device) -> Any:
     with torch.no_grad():
-        if algo == "actor_critic":
+        if algo in {"a3c", "ppo"}:
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
-            action_probs, _ = runtime["model"](state_tensor)
-            return torch.argmax(action_probs, dim=1).item()
+            logits, _ = runtime["model"](state_tensor)
+            return torch.argmax(logits, dim=1).item()
 
-        if algo == "actor_critic_continuous":
-            state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
-            mu, _, _ = runtime["model"](state_tensor)
-            action = mu.cpu().numpy()[0]
-            return np.clip(action, -2.0, 2.0)
+        if algo == "ddpg":
+            env = runtime["env"]
+            return runtime["module"].select_action(
+                runtime["actor"],
+                state,
+                device,
+                None,
+                env.action_space.low,
+                env.action_space.high,
+            )
+
+        if algo == "td3":
+            env = runtime["env"]
+            return runtime["module"].select_action(
+                runtime["actor"],
+                state,
+                device,
+                0.0,
+                env.action_space.low,
+                env.action_space.high,
+            )
+
+        if algo == "sac":
+            env = runtime["env"]
+            return runtime["module"].select_action(
+                runtime["actor"],
+                state,
+                device,
+                deterministic=True,
+                low=env.action_space.low,
+                high=env.action_space.high,
+            )
 
         if algo in {"dqn", "ddqn", "per_ddqn"}:
             state_tensor = torch.FloatTensor(np.array(state)).unsqueeze(0).to(device) / 255.0

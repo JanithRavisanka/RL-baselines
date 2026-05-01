@@ -5,7 +5,11 @@ This repository contains multiple model-free and model-based RL algorithm implem
 ## Algorithms Included
 
 - Model-free:
-  - Actor-Critic (`CartPole-v1`, `Pendulum-v1`)
+  - A3C (`CartPole-v1`)
+  - PPO (`CartPole-v1`)
+  - DDPG (`Pendulum-v1`)
+  - TD3 (`Pendulum-v1`)
+  - SAC (`Pendulum-v1`)
   - DQN (`ALE/Breakout-v5`)
   - Double DQN (`ALE/Breakout-v5`)
   - PER DDQN (`ALE/Breakout-v5`)
@@ -41,14 +45,29 @@ Run commands from repo root (`/home/administrator/baselines`).
 
 ### Model-Free
 
-- Actor-Critic (CartPole):
+- A3C (CartPole):
 ```bash
-python baselines/model-free/actor-critic/actor_critic.py
+python baselines/model-free/A3C/a3c.py
 ```
 
-- Actor-Critic Continuous (Pendulum):
+- PPO (CartPole):
 ```bash
-python baselines/model-free/actor-critic/actor_critic_continuous.py
+python baselines/model-free/PPO/ppo.py
+```
+
+- DDPG (Pendulum):
+```bash
+python baselines/model-free/DDPG/ddpg.py
+```
+
+- TD3 (Pendulum):
+```bash
+python baselines/model-free/TD3/td3.py
+```
+
+- SAC (Pendulum):
+```bash
+python baselines/model-free/SAC/sac.py
 ```
 
 - DQN (Breakout):
@@ -134,8 +153,11 @@ python play_model.py --algo <algorithm_key>
 
 Supported `--algo` values:
 
-- `actor_critic`
-- `actor_critic_continuous`
+- `a3c`
+- `ppo`
+- `ddpg`
+- `td3`
+- `sac`
 - `dqn`
 - `ddqn`
 - `per_ddqn`
@@ -157,7 +179,7 @@ python play_model.py --algo dqn --model-path results/dqn/run_20260428_081628/mod
 
 - Save a GIF rollout:
 ```bash
-python play_model.py --algo actor_critic --save-gif results/actor_critic_eval.gif
+python play_model.py --algo ppo --save-gif results/ppo_eval.gif
 ```
 
 ### Notes
@@ -212,7 +234,7 @@ python run_all_algorithms.py --max-parallel 3
 
 Each algorithm is annotated with its GPU VRAM estimate and CPU weight. The scheduler
 launches jobs whenever the remaining budget allows, preferring shortest-estimated-duration
-jobs first. CPU-only algorithms (e.g., `actor_critic`, `dyna_q`) run freely alongside
+jobs first. CPU-only algorithms (e.g., `a3c`, `dyna_q`) run freely alongside
 GPU jobs without consuming GPU budget. Already-completed algorithms are auto-detected
 and skipped.
 
