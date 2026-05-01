@@ -217,6 +217,39 @@ python run_all_algorithms.py --gpu-budget-mb 10000
 python run_all_algorithms.py --max-parallel 3
 ```
 
+### Optimized Server Run
+
+For the RTX PRO 4000 / 24-core server, use the staged launcher. It does not change
+any learning algorithm; it only caps CPU thread oversubscription and runs compatible
+jobs together.
+
+```bash
+python run_optimized_server.py
+```
+
+Useful variants:
+
+```bash
+# Preview the staged plan
+python run_optimized_server.py --dry-run
+
+# Retrain even if previous outputs exist
+python run_optimized_server.py --force
+
+# Run selected stages
+python run_optimized_server.py --stage atari_value
+python run_optimized_server.py --stage dreamer_v2
+```
+
+Stages:
+
+- `light`: `dyna_q ppo ddpg td3 sac mpc`
+- `atari_value`: `dqn ddqn per_ddqn`
+- `muzero`: `muzero`
+- `dreamer_v1`: `dreamer_v1`
+- `dreamer_v2`: `dreamer_v2`
+- `dreamer_v3`: `dreamer_v3`
+
 ### Scheduler flags
 
 | Flag | Default | Description |
