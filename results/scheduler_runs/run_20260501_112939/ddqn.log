@@ -1,0 +1,181 @@
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/ddqn/run_20260501_112941
+A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138)
+[Powered by Stella]
+Starting Double DQN Training for 500000 frames...
+Frame: 2000/500000 | Epsilon: 0.99 | Avg Reward (Last 20): 0.20
+Frame: 4000/500000 | Epsilon: 0.99 | Avg Reward (Last 20): 0.15
+Frame: 6000/500000 | Epsilon: 0.98 | Avg Reward (Last 20): 0.15
+Frame: 8000/500000 | Epsilon: 0.97 | Avg Reward (Last 20): 0.25
+Frame: 10000/500000 | Epsilon: 0.96 | Avg Reward (Last 20): 0.20
+Frame: 12000/500000 | Epsilon: 0.96 | Avg Reward (Last 20): 0.30
+Frame: 14000/500000 | Epsilon: 0.95 | Avg Reward (Last 20): 0.10
+Frame: 16000/500000 | Epsilon: 0.94 | Avg Reward (Last 20): 0.15
+Frame: 18000/500000 | Epsilon: 0.94 | Avg Reward (Last 20): 0.25
+Frame: 20000/500000 | Epsilon: 0.93 | Avg Reward (Last 20): 0.20
+Frame: 22000/500000 | Epsilon: 0.92 | Avg Reward (Last 20): 0.20
+Frame: 24000/500000 | Epsilon: 0.91 | Avg Reward (Last 20): 0.25
+Frame: 26000/500000 | Epsilon: 0.91 | Avg Reward (Last 20): 0.50
+Frame: 28000/500000 | Epsilon: 0.90 | Avg Reward (Last 20): 0.35
+Frame: 30000/500000 | Epsilon: 0.89 | Avg Reward (Last 20): 0.35
+Frame: 32000/500000 | Epsilon: 0.88 | Avg Reward (Last 20): 0.55
+Frame: 34000/500000 | Epsilon: 0.88 | Avg Reward (Last 20): 0.30
+Frame: 36000/500000 | Epsilon: 0.87 | Avg Reward (Last 20): 0.75
+Frame: 38000/500000 | Epsilon: 0.86 | Avg Reward (Last 20): 0.45
+Frame: 40000/500000 | Epsilon: 0.86 | Avg Reward (Last 20): 0.75
+Frame: 42000/500000 | Epsilon: 0.85 | Avg Reward (Last 20): 0.30
+Frame: 44000/500000 | Epsilon: 0.84 | Avg Reward (Last 20): 0.80
+Frame: 46000/500000 | Epsilon: 0.83 | Avg Reward (Last 20): 0.60
+Frame: 48000/500000 | Epsilon: 0.83 | Avg Reward (Last 20): 0.55
+Frame: 50000/500000 | Epsilon: 0.82 | Avg Reward (Last 20): 0.70
+Frame: 52000/500000 | Epsilon: 0.81 | Avg Reward (Last 20): 0.40
+Frame: 54000/500000 | Epsilon: 0.81 | Avg Reward (Last 20): 0.85
+Frame: 56000/500000 | Epsilon: 0.80 | Avg Reward (Last 20): 0.75
+Frame: 58000/500000 | Epsilon: 0.79 | Avg Reward (Last 20): 0.30
+Frame: 60000/500000 | Epsilon: 0.78 | Avg Reward (Last 20): 0.75
+Frame: 62000/500000 | Epsilon: 0.78 | Avg Reward (Last 20): 0.65
+Frame: 64000/500000 | Epsilon: 0.77 | Avg Reward (Last 20): 0.55
+Frame: 66000/500000 | Epsilon: 0.76 | Avg Reward (Last 20): 0.45
+Frame: 68000/500000 | Epsilon: 0.76 | Avg Reward (Last 20): 0.60
+Frame: 70000/500000 | Epsilon: 0.75 | Avg Reward (Last 20): 0.85
+Frame: 72000/500000 | Epsilon: 0.74 | Avg Reward (Last 20): 0.45
+Frame: 74000/500000 | Epsilon: 0.73 | Avg Reward (Last 20): 1.20
+Frame: 76000/500000 | Epsilon: 0.73 | Avg Reward (Last 20): 0.85
+Frame: 78000/500000 | Epsilon: 0.72 | Avg Reward (Last 20): 0.85
+Frame: 80000/500000 | Epsilon: 0.71 | Avg Reward (Last 20): 0.45
+Frame: 82000/500000 | Epsilon: 0.70 | Avg Reward (Last 20): 1.05
+Frame: 84000/500000 | Epsilon: 0.70 | Avg Reward (Last 20): 0.75
+Frame: 86000/500000 | Epsilon: 0.69 | Avg Reward (Last 20): 0.90
+Frame: 88000/500000 | Epsilon: 0.68 | Avg Reward (Last 20): 1.05
+Frame: 90000/500000 | Epsilon: 0.68 | Avg Reward (Last 20): 0.70
+Frame: 92000/500000 | Epsilon: 0.67 | Avg Reward (Last 20): 0.75
+Frame: 94000/500000 | Epsilon: 0.66 | Avg Reward (Last 20): 0.30
+Frame: 96000/500000 | Epsilon: 0.65 | Avg Reward (Last 20): 0.50
+Frame: 98000/500000 | Epsilon: 0.65 | Avg Reward (Last 20): 0.90
+Frame: 100000/500000 | Epsilon: 0.64 | Avg Reward (Last 20): 1.30
+Frame: 102000/500000 | Epsilon: 0.63 | Avg Reward (Last 20): 1.10
+Frame: 104000/500000 | Epsilon: 0.63 | Avg Reward (Last 20): 0.70
+Frame: 106000/500000 | Epsilon: 0.62 | Avg Reward (Last 20): 1.25
+Frame: 108000/500000 | Epsilon: 0.61 | Avg Reward (Last 20): 1.30
+Frame: 110000/500000 | Epsilon: 0.60 | Avg Reward (Last 20): 0.90
+Frame: 112000/500000 | Epsilon: 0.60 | Avg Reward (Last 20): 1.10
+Frame: 114000/500000 | Epsilon: 0.59 | Avg Reward (Last 20): 0.95
+Frame: 116000/500000 | Epsilon: 0.58 | Avg Reward (Last 20): 1.40
+Frame: 118000/500000 | Epsilon: 0.58 | Avg Reward (Last 20): 1.50
+Frame: 120000/500000 | Epsilon: 0.57 | Avg Reward (Last 20): 1.65
+Frame: 122000/500000 | Epsilon: 0.56 | Avg Reward (Last 20): 1.25
+Frame: 124000/500000 | Epsilon: 0.55 | Avg Reward (Last 20): 1.35
+Frame: 126000/500000 | Epsilon: 0.55 | Avg Reward (Last 20): 1.10
+Frame: 128000/500000 | Epsilon: 0.54 | Avg Reward (Last 20): 1.15
+Frame: 130000/500000 | Epsilon: 0.53 | Avg Reward (Last 20): 1.80
+Frame: 132000/500000 | Epsilon: 0.52 | Avg Reward (Last 20): 1.65
+Frame: 134000/500000 | Epsilon: 0.52 | Avg Reward (Last 20): 1.30
+Frame: 136000/500000 | Epsilon: 0.51 | Avg Reward (Last 20): 1.15
+Frame: 138000/500000 | Epsilon: 0.50 | Avg Reward (Last 20): 1.55
+Frame: 140000/500000 | Epsilon: 0.50 | Avg Reward (Last 20): 1.20
+Frame: 142000/500000 | Epsilon: 0.49 | Avg Reward (Last 20): 1.55
+Frame: 144000/500000 | Epsilon: 0.48 | Avg Reward (Last 20): 1.20
+Frame: 146000/500000 | Epsilon: 0.47 | Avg Reward (Last 20): 1.40
+Frame: 148000/500000 | Epsilon: 0.47 | Avg Reward (Last 20): 1.75
+Frame: 150000/500000 | Epsilon: 0.46 | Avg Reward (Last 20): 1.70
+Frame: 152000/500000 | Epsilon: 0.45 | Avg Reward (Last 20): 1.45
+Frame: 154000/500000 | Epsilon: 0.45 | Avg Reward (Last 20): 1.75
+Frame: 156000/500000 | Epsilon: 0.44 | Avg Reward (Last 20): 1.35
+Frame: 158000/500000 | Epsilon: 0.43 | Avg Reward (Last 20): 1.45
+Frame: 160000/500000 | Epsilon: 0.42 | Avg Reward (Last 20): 1.90
+Frame: 162000/500000 | Epsilon: 0.42 | Avg Reward (Last 20): 2.05
+Frame: 164000/500000 | Epsilon: 0.41 | Avg Reward (Last 20): 1.30
+Frame: 166000/500000 | Epsilon: 0.40 | Avg Reward (Last 20): 2.25
+Frame: 168000/500000 | Epsilon: 0.40 | Avg Reward (Last 20): 2.10
+Frame: 170000/500000 | Epsilon: 0.39 | Avg Reward (Last 20): 1.90
+Frame: 172000/500000 | Epsilon: 0.38 | Avg Reward (Last 20): 2.10
+Frame: 174000/500000 | Epsilon: 0.37 | Avg Reward (Last 20): 2.05
+Frame: 176000/500000 | Epsilon: 0.37 | Avg Reward (Last 20): 2.45
+Frame: 178000/500000 | Epsilon: 0.36 | Avg Reward (Last 20): 1.80
+Frame: 180000/500000 | Epsilon: 0.35 | Avg Reward (Last 20): 3.05
+Frame: 182000/500000 | Epsilon: 0.34 | Avg Reward (Last 20): 1.75
+Frame: 184000/500000 | Epsilon: 0.34 | Avg Reward (Last 20): 1.90
+Frame: 186000/500000 | Epsilon: 0.33 | Avg Reward (Last 20): 2.75
+Frame: 188000/500000 | Epsilon: 0.32 | Avg Reward (Last 20): 1.55
+Frame: 190000/500000 | Epsilon: 0.32 | Avg Reward (Last 20): 2.40
+Frame: 192000/500000 | Epsilon: 0.31 | Avg Reward (Last 20): 2.55
+Frame: 194000/500000 | Epsilon: 0.30 | Avg Reward (Last 20): 1.65
+Frame: 196000/500000 | Epsilon: 0.29 | Avg Reward (Last 20): 2.35
+Frame: 198000/500000 | Epsilon: 0.29 | Avg Reward (Last 20): 2.85
+Frame: 200000/500000 | Epsilon: 0.28 | Avg Reward (Last 20): 2.15
+Frame: 202000/500000 | Epsilon: 0.27 | Avg Reward (Last 20): 2.05
+Frame: 204000/500000 | Epsilon: 0.27 | Avg Reward (Last 20): 2.15
+Frame: 206000/500000 | Epsilon: 0.26 | Avg Reward (Last 20): 2.25
+Frame: 208000/500000 | Epsilon: 0.25 | Avg Reward (Last 20): 2.55
+Frame: 210000/500000 | Epsilon: 0.24 | Avg Reward (Last 20): 2.05
+Frame: 212000/500000 | Epsilon: 0.24 | Avg Reward (Last 20): 3.05
+Frame: 214000/500000 | Epsilon: 0.23 | Avg Reward (Last 20): 3.45
+Frame: 216000/500000 | Epsilon: 0.22 | Avg Reward (Last 20): 3.05
+Frame: 218000/500000 | Epsilon: 0.22 | Avg Reward (Last 20): 3.25
+Frame: 220000/500000 | Epsilon: 0.21 | Avg Reward (Last 20): 2.10
+Frame: 222000/500000 | Epsilon: 0.20 | Avg Reward (Last 20): 1.85
+Frame: 224000/500000 | Epsilon: 0.19 | Avg Reward (Last 20): 2.85
+Frame: 226000/500000 | Epsilon: 0.19 | Avg Reward (Last 20): 2.55
+Frame: 228000/500000 | Epsilon: 0.18 | Avg Reward (Last 20): 2.45
+Frame: 230000/500000 | Epsilon: 0.17 | Avg Reward (Last 20): 3.05
+Frame: 232000/500000 | Epsilon: 0.16 | Avg Reward (Last 20): 3.00
+Frame: 234000/500000 | Epsilon: 0.16 | Avg Reward (Last 20): 2.90
+Frame: 236000/500000 | Epsilon: 0.15 | Avg Reward (Last 20): 3.65
+Frame: 238000/500000 | Epsilon: 0.14 | Avg Reward (Last 20): 2.80
+Frame: 240000/500000 | Epsilon: 0.14 | Avg Reward (Last 20): 3.00
+Frame: 242000/500000 | Epsilon: 0.13 | Avg Reward (Last 20): 3.80
+Frame: 244000/500000 | Epsilon: 0.12 | Avg Reward (Last 20): 3.45
+Frame: 246000/500000 | Epsilon: 0.11 | Avg Reward (Last 20): 4.00
+Frame: 248000/500000 | Epsilon: 0.11 | Avg Reward (Last 20): 3.65
+Frame: 250000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 2.50
+Frame: 252000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.00
+Frame: 254000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 2.85
+Frame: 256000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 2.80
+Frame: 258000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.45
+Frame: 260000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.20
+Frame: 262000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.45
+Frame: 264000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.50
+Frame: 266000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.10
+Frame: 268000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.90
+Frame: 270000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.15
+Frame: 272000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.70
+Frame: 274000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.35
+Frame: 276000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.55
+Frame: 278000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 2.60
+Frame: 280000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 2.90
+Frame: 282000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.50
+Frame: 284000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.95
+Frame: 286000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.15
+Frame: 288000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.05
+Frame: 290000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.10
+Frame: 292000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.50
+Frame: 294000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.25
+Frame: 296000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.95
+Frame: 298000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.50
+Frame: 300000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.50
+Frame: 302000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.35
+Frame: 304000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.25
+Frame: 306000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.85
+Frame: 308000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.55
+Frame: 310000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 4.35
+Frame: 312000/500000 | Epsilon: 0.10 | Avg Reward (Last 20): 3.00
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/DDQN/double_dqn.py", line 305, in <module>
+    model, rewards = train()
+                     ^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/DDQN/double_dqn.py", line 204, in train
+    best_next_actions = q_network(next_states_tensor).argmax(dim=1, keepdim=True)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-free/DDQN/double_dqn.py", line 49, in forward
+    x = F.relu(self.conv3(x))
+        ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/functional.py", line 1723, in relu
+    result = torch.relu(input)
+             ^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
