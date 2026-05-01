@@ -1,0 +1,72 @@
+Using device: cuda
+Saving all results to: /home/administrator/FYP/RL-baselines/results/mpc/run_20260501_134010
+Collecting seed dataset with random actions...
+Training initial Dynamics Model...
+Starting MPC Control loop...
+Episode 1/100 | Total Reward: -306.89
+   -> Dynamics Model retrained. One-step MSE: 0.00162 | 5-step rollout MSE: 0.00343
+Episode 2/100 | Total Reward: -0.42
+   -> Dynamics Model retrained. One-step MSE: 0.00155 | 5-step rollout MSE: 0.00538
+Episode 3/100 | Total Reward: -127.62
+   -> Dynamics Model retrained. One-step MSE: 0.00141 | 5-step rollout MSE: 0.00758
+Episode 4/100 | Total Reward: -350.59
+   -> Dynamics Model retrained. One-step MSE: 0.00131 | 5-step rollout MSE: 0.00376
+Episode 5/100 | Total Reward: -245.13
+   -> Dynamics Model retrained. One-step MSE: 0.00124 | 5-step rollout MSE: 0.00333
+Episode 6/100 | Total Reward: -122.87
+   -> Dynamics Model retrained. One-step MSE: 0.00126 | 5-step rollout MSE: 0.00390
+Episode 7/100 | Total Reward: -125.10
+   -> Dynamics Model retrained. One-step MSE: 0.00115 | 5-step rollout MSE: 0.00555
+Episode 8/100 | Total Reward: -120.23
+   -> Dynamics Model retrained. One-step MSE: 0.00111 | 5-step rollout MSE: 0.00282
+Episode 9/100 | Total Reward: -116.74
+   -> Dynamics Model retrained. One-step MSE: 0.00104 | 5-step rollout MSE: 0.00514
+Episode 10/100 | Total Reward: -240.89
+   -> Dynamics Model retrained. One-step MSE: 0.00107 | 5-step rollout MSE: 0.00251
+Episode 11/100 | Total Reward: -120.58
+   -> Dynamics Model retrained. One-step MSE: 0.00095 | 5-step rollout MSE: 0.00431
+Episode 12/100 | Total Reward: -115.19
+   -> Dynamics Model retrained. One-step MSE: 0.00095 | 5-step rollout MSE: 0.00211
+Episode 13/100 | Total Reward: -241.70
+   -> Dynamics Model retrained. One-step MSE: 0.00091 | 5-step rollout MSE: 0.00217
+Episode 14/100 | Total Reward: -339.67
+   -> Dynamics Model retrained. One-step MSE: 0.00091 | 5-step rollout MSE: 0.00245
+Episode 15/100 | Total Reward: -116.73
+   -> Dynamics Model retrained. One-step MSE: 0.00091 | 5-step rollout MSE: 0.00502
+Episode 16/100 | Total Reward: -227.10
+   -> Dynamics Model retrained. One-step MSE: 0.00085 | 5-step rollout MSE: 0.00210
+Episode 17/100 | Total Reward: -0.37
+   -> Dynamics Model retrained. One-step MSE: 0.00093 | 5-step rollout MSE: 0.00248
+Episode 18/100 | Total Reward: -231.59
+   -> Dynamics Model retrained. One-step MSE: 0.00089 | 5-step rollout MSE: 0.00245
+Episode 19/100 | Total Reward: -125.00
+   -> Dynamics Model retrained. One-step MSE: 0.00089 | 5-step rollout MSE: 0.00219
+Episode 20/100 | Total Reward: -0.79
+   -> Dynamics Model retrained. One-step MSE: 0.00079 | 5-step rollout MSE: 0.00159
+Episode 21/100 | Total Reward: -120.62
+   -> Dynamics Model retrained. One-step MSE: 0.00079 | 5-step rollout MSE: 0.00131
+Episode 22/100 | Total Reward: -0.71
+   -> Dynamics Model retrained. One-step MSE: 0.00080 | 5-step rollout MSE: 0.00166
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 403, in <module>
+    models, planner, rewards = train(args)
+                               ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 320, in train
+    action = planner.get_action(state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 194, in get_action
+    returns = self.rollout_return(current_state, action_sequences)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 169, in rollout_return
+    next_state_batch = state_batch + self.predict_delta(state_batch, actions_t)
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/MPC/learned_dynamics_mpc.py", line 157, in predict_delta
+    preds.append(self.normalizer.denorm_delta(model(norm_states, norm_actions)))
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _call_impl
+    def _call_impl(self, *args, **kwargs):
+
+KeyboardInterrupt

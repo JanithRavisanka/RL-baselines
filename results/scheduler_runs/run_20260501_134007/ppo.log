@@ -1,0 +1,40 @@
+Saving all results to: /home/administrator/FYP/RL-baselines/results/ppo/run_20260501_134009
+Update 5/500 | Avg reward (last 10): 31.70
+Update 10/500 | Avg reward (last 10): 47.40
+Update 15/500 | Avg reward (last 10): 197.00
+Update 20/500 | Avg reward (last 10): 75.30
+Update 25/500 | Avg reward (last 10): 217.30
+Update 30/500 | Avg reward (last 10): 157.50
+Update 35/500 | Avg reward (last 10): 101.00
+Update 40/500 | Avg reward (last 10): 194.50
+Update 45/500 | Avg reward (last 10): 302.90
+Update 50/500 | Avg reward (last 10): 78.20
+Update 55/500 | Avg reward (last 10): 209.10
+Update 60/500 | Avg reward (last 10): 268.90
+Update 65/500 | Avg reward (last 10): 216.50
+Update 70/500 | Avg reward (last 10): 139.60
+Update 75/500 | Avg reward (last 10): 65.70
+Update 80/500 | Avg reward (last 10): 379.50
+Update 85/500 | Avg reward (last 10): 128.90
+Update 90/500 | Avg reward (last 10): 404.50
+Update 95/500 | Avg reward (last 10): 185.00
+Update 100/500 | Avg reward (last 10): 385.80
+Update 105/500 | Avg reward (last 10): 404.30
+Update 110/500 | Avg reward (last 10): 265.70
+Update 115/500 | Avg reward (last 10): 135.30
+Update 120/500 | Avg reward (last 10): 259.80
+Update 125/500 | Avg reward (last 10): 196.00
+Update 130/500 | Avg reward (last 10): 314.00
+Update 135/500 | Avg reward (last 10): 319.00
+Update 140/500 | Avg reward (last 10): 226.80
+Update 145/500 | Avg reward (last 10): 304.20
+Update 150/500 | Avg reward (last 10): 269.60
+Update 155/500 | Avg reward (last 10): 302.30
+Update 160/500 | Avg reward (last 10): 414.00
+Update 165/500 | Avg reward (last 10): 414.90
+Update 170/500 | Avg reward (last 10): 500.00
+Solved.
+Model saved: /home/administrator/FYP/RL-baselines/results/ppo/run_20260501_134009/model.pth
+Training curve saved: /home/administrator/FYP/RL-baselines/results/ppo/run_20260501_134009/training_curve.png
+Evaluation reward: 500.00
+Evaluation GIF saved: /home/administrator/FYP/RL-baselines/results/ppo/run_20260501_134009/ppo_cartpole_agent.gif

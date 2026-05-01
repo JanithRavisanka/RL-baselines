@@ -1,0 +1,35 @@
+Saving all results to: /home/administrator/FYP/RL-baselines/results/td3/run_20260501_134009
+Episode 10/300 | Avg reward: -1407.13
+Episode 20/300 | Avg reward: -1260.56
+Episode 30/300 | Avg reward: -975.04
+Episode 40/300 | Avg reward: -561.48
+Episode 50/300 | Avg reward: -337.40
+Episode 60/300 | Avg reward: -160.83
+Episode 70/300 | Avg reward: -128.30
+Episode 80/300 | Avg reward: -133.99
+Episode 90/300 | Avg reward: -208.88
+Episode 100/300 | Avg reward: -122.32
+Episode 110/300 | Avg reward: -224.82
+Episode 120/300 | Avg reward: -121.95
+Episode 130/300 | Avg reward: -202.30
+Episode 140/300 | Avg reward: -214.48
+Episode 150/300 | Avg reward: -138.38
+Episode 160/300 | Avg reward: -146.26
+Episode 170/300 | Avg reward: -143.21
+Episode 180/300 | Avg reward: -173.99
+Episode 190/300 | Avg reward: -120.06
+Episode 200/300 | Avg reward: -158.50
+Episode 210/300 | Avg reward: -167.56
+Episode 220/300 | Avg reward: -175.20
+Episode 230/300 | Avg reward: -121.95
+Episode 240/300 | Avg reward: -173.93
+Episode 250/300 | Avg reward: -182.94
+Episode 260/300 | Avg reward: -138.38
+Episode 270/300 | Avg reward: -135.21
+Episode 280/300 | Avg reward: -120.79
+Episode 290/300 | Avg reward: -157.98
+Episode 300/300 | Avg reward: -146.74
+Model saved: /home/administrator/FYP/RL-baselines/results/td3/run_20260501_134009/model.pth
+Training curve saved: /home/administrator/FYP/RL-baselines/results/td3/run_20260501_134009/training_curve.png
+Evaluation reward: -130.68
+Evaluation GIF saved: /home/administrator/FYP/RL-baselines/results/td3/run_20260501_134009/td3_pendulum_agent.gif
