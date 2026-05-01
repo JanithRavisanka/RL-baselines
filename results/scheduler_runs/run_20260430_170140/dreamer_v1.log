@@ -1,0 +1,270 @@
+Saving all outputs to: /home/administrator/FYP/RL-baselines/results/dreamer_v1/run_20260430_214910
+Prefill: 1000/50000
+Prefill: 2000/50000
+Prefill: 3000/50000
+Prefill: 4000/50000
+Prefill: 5000/50000
+Prefill: 6000/50000
+Prefill: 7000/50000
+Prefill: 8000/50000
+Prefill: 9000/50000
+Prefill: 10000/50000
+Prefill: 11000/50000
+Prefill: 12000/50000
+Prefill: 13000/50000
+Prefill: 14000/50000
+Prefill: 15000/50000
+Prefill: 16000/50000
+Prefill: 17000/50000
+Prefill: 18000/50000
+Prefill: 19000/50000
+Prefill: 20000/50000
+Prefill: 21000/50000
+Prefill: 22000/50000
+Prefill: 23000/50000
+Prefill: 24000/50000
+Prefill: 25000/50000
+Prefill: 26000/50000
+Prefill: 27000/50000
+Prefill: 28000/50000
+Prefill: 29000/50000
+Prefill: 30000/50000
+Prefill: 31000/50000
+Prefill: 32000/50000
+Prefill: 33000/50000
+Prefill: 34000/50000
+Prefill: 35000/50000
+Prefill: 36000/50000
+Prefill: 37000/50000
+Prefill: 38000/50000
+Prefill: 39000/50000
+Prefill: 40000/50000
+Prefill: 41000/50000
+Prefill: 42000/50000
+Prefill: 43000/50000
+Prefill: 44000/50000
+Prefill: 45000/50000
+Prefill: 46000/50000
+Prefill: 47000/50000
+Prefill: 48000/50000
+Prefill: 49000/50000
+Update 0/20000 | world 0.7738 | actor -0.1149 | value 0.0162
+Collected 1000 policy steps | episodes 1 | reward sum 18.80 | replay 51000
+Update 100/20000 | world 0.0057 | actor -12.7514 | value 0.6461
+Collected 1000 policy steps | episodes 1 | reward sum 19.66 | replay 52000
+Update 200/20000 | world 0.0089 | actor -5.7107 | value 0.0511
+Collected 1000 policy steps | episodes 1 | reward sum 9.94 | replay 53000
+Update 300/20000 | world 0.0045 | actor -4.3934 | value 0.0231
+Collected 1000 policy steps | episodes 1 | reward sum 29.73 | replay 54000
+Update 400/20000 | world 0.0048 | actor -3.3106 | value 0.0139
+Collected 1000 policy steps | episodes 1 | reward sum 117.11 | replay 55000
+Update 500/20000 | world 0.0043 | actor -3.3178 | value 0.0164
+Collected 1000 policy steps | episodes 1 | reward sum 49.07 | replay 56000
+Update 600/20000 | world 0.0044 | actor -5.4021 | value 0.0312
+Collected 1000 policy steps | episodes 1 | reward sum 44.44 | replay 57000
+Update 700/20000 | world 0.0043 | actor -5.6024 | value 0.0346
+Collected 1000 policy steps | episodes 1 | reward sum 50.81 | replay 58000
+Update 800/20000 | world 0.0043 | actor -4.8405 | value 0.0143
+Collected 1000 policy steps | episodes 1 | reward sum 29.15 | replay 59000
+Update 900/20000 | world 0.0041 | actor -5.3525 | value 0.0186
+Collected 1000 policy steps | episodes 1 | reward sum 41.20 | replay 60000
+Update 1000/20000 | world 0.0039 | actor -5.0753 | value 0.0162
+Collected 1000 policy steps | episodes 1 | reward sum 29.63 | replay 61000
+Update 1100/20000 | world 0.0032 | actor -5.5791 | value 0.0164
+Collected 1000 policy steps | episodes 1 | reward sum 55.71 | replay 62000
+Update 1200/20000 | world 0.0034 | actor -5.3584 | value 0.0117
+Collected 1000 policy steps | episodes 1 | reward sum 97.44 | replay 63000
+Update 1300/20000 | world 0.0035 | actor -5.5588 | value 0.0341
+Collected 1000 policy steps | episodes 1 | reward sum 18.86 | replay 64000
+Update 1400/20000 | world 0.0028 | actor -7.2851 | value 0.0109
+Collected 1000 policy steps | episodes 1 | reward sum 86.03 | replay 65000
+Update 1500/20000 | world 0.0032 | actor -5.9700 | value 0.0120
+Collected 1000 policy steps | episodes 1 | reward sum 20.15 | replay 66000
+Update 1600/20000 | world 0.0024 | actor -5.6399 | value 0.0057
+Collected 1000 policy steps | episodes 1 | reward sum 21.03 | replay 67000
+Update 1700/20000 | world 0.0026 | actor -6.4983 | value 0.0081
+Collected 1000 policy steps | episodes 1 | reward sum 40.63 | replay 68000
+Update 1800/20000 | world 0.0024 | actor -5.8516 | value 0.0044
+Collected 1000 policy steps | episodes 1 | reward sum 102.17 | replay 69000
+Update 1900/20000 | world 0.0033 | actor -6.1023 | value 0.0127
+Collected 1000 policy steps | episodes 1 | reward sum 27.20 | replay 70000
+Update 2000/20000 | world 0.0028 | actor -6.0553 | value 0.0064
+Collected 1000 policy steps | episodes 1 | reward sum 33.79 | replay 71000
+Update 2100/20000 | world 0.0027 | actor -4.7066 | value 0.0038
+Collected 1000 policy steps | episodes 1 | reward sum 30.28 | replay 72000
+Update 2200/20000 | world 0.0030 | actor -4.0685 | value 0.0049
+Collected 1000 policy steps | episodes 1 | reward sum 20.38 | replay 73000
+Update 2300/20000 | world 0.0031 | actor -4.6363 | value 0.0050
+Collected 1000 policy steps | episodes 1 | reward sum 57.03 | replay 74000
+Update 2400/20000 | world 0.0024 | actor -4.4599 | value 0.0060
+Collected 1000 policy steps | episodes 1 | reward sum 27.84 | replay 75000
+Update 2500/20000 | world 0.0028 | actor -4.5105 | value 0.0048
+Collected 1000 policy steps | episodes 1 | reward sum 28.68 | replay 76000
+Update 2600/20000 | world 0.0021 | actor -4.7041 | value 0.0156
+Collected 1000 policy steps | episodes 1 | reward sum 27.67 | replay 77000
+Update 2700/20000 | world 0.0035 | actor -5.3408 | value 0.0074
+Collected 1000 policy steps | episodes 1 | reward sum 45.83 | replay 78000
+Update 2800/20000 | world 0.0050 | actor -4.7873 | value 0.0051
+Collected 1000 policy steps | episodes 1 | reward sum 30.13 | replay 79000
+Update 2900/20000 | world 0.0022 | actor -5.7582 | value 0.0119
+Collected 1000 policy steps | episodes 1 | reward sum 17.83 | replay 80000
+Update 3000/20000 | world 0.0026 | actor -7.0122 | value 0.0223
+Collected 1000 policy steps | episodes 1 | reward sum 18.41 | replay 81000
+Update 3100/20000 | world 0.0020 | actor -5.4585 | value 0.0108
+Collected 1000 policy steps | episodes 1 | reward sum 18.30 | replay 82000
+Update 3200/20000 | world 0.0039 | actor -5.4714 | value 0.0158
+Collected 1000 policy steps | episodes 1 | reward sum 22.32 | replay 83000
+Update 3300/20000 | world 0.0018 | actor -4.8856 | value 0.0213
+Collected 1000 policy steps | episodes 1 | reward sum 19.07 | replay 84000
+Update 3400/20000 | world 0.0022 | actor -5.6024 | value 0.0186
+Collected 1000 policy steps | episodes 1 | reward sum 18.38 | replay 85000
+Update 3500/20000 | world 0.0019 | actor -7.0569 | value 0.0292
+Collected 1000 policy steps | episodes 1 | reward sum 28.58 | replay 86000
+Update 3600/20000 | world 0.0022 | actor -4.3500 | value 0.0268
+Collected 1000 policy steps | episodes 1 | reward sum 29.11 | replay 87000
+Update 3700/20000 | world 0.0022 | actor -4.4003 | value 0.0364
+Collected 1000 policy steps | episodes 1 | reward sum 18.27 | replay 88000
+Update 3800/20000 | world 0.0018 | actor -4.3066 | value 0.0321
+Collected 1000 policy steps | episodes 1 | reward sum 18.81 | replay 89000
+Update 3900/20000 | world 0.0018 | actor -5.2558 | value 0.0898
+Collected 1000 policy steps | episodes 1 | reward sum 18.78 | replay 90000
+Update 4000/20000 | world 0.0020 | actor -3.9741 | value 0.0184
+Collected 1000 policy steps | episodes 1 | reward sum 38.49 | replay 91000
+Update 4100/20000 | world 0.0020 | actor -4.3084 | value 0.0832
+Collected 1000 policy steps | episodes 1 | reward sum 27.64 | replay 92000
+Update 4200/20000 | world 0.0017 | actor -4.3498 | value 0.0217
+Collected 1000 policy steps | episodes 1 | reward sum 28.92 | replay 93000
+Update 4300/20000 | world 0.0017 | actor -4.4628 | value 0.0304
+Collected 1000 policy steps | episodes 1 | reward sum 28.31 | replay 94000
+Update 4400/20000 | world 0.0017 | actor -4.6405 | value 0.0227
+Collected 1000 policy steps | episodes 1 | reward sum 45.83 | replay 95000
+Update 4500/20000 | world 0.0015 | actor -3.7834 | value 0.0091
+Collected 1000 policy steps | episodes 1 | reward sum 30.03 | replay 96000
+Update 4600/20000 | world 0.0017 | actor -4.3574 | value 0.0108
+Collected 1000 policy steps | episodes 1 | reward sum 24.80 | replay 97000
+Update 4700/20000 | world 0.0020 | actor -3.8997 | value 0.0208
+Collected 1000 policy steps | episodes 1 | reward sum 32.62 | replay 98000
+Update 4800/20000 | world 0.0016 | actor -3.8717 | value 0.0114
+Collected 1000 policy steps | episodes 1 | reward sum 25.50 | replay 99000
+Update 4900/20000 | world 0.0019 | actor -4.3609 | value 0.0241
+Collected 1000 policy steps | episodes 1 | reward sum 24.55 | replay 100000
+Update 5000/20000 | world 0.0016 | actor -4.5529 | value 0.0207
+Collected 1000 policy steps | episodes 1 | reward sum 24.66 | replay 101000
+Update 5100/20000 | world 0.0017 | actor -3.6603 | value 0.0249
+Collected 1000 policy steps | episodes 1 | reward sum 33.82 | replay 102000
+Update 5200/20000 | world 0.0019 | actor -3.9944 | value 0.0130
+Collected 1000 policy steps | episodes 1 | reward sum 30.28 | replay 103000
+Update 5300/20000 | world 0.0014 | actor -5.0280 | value 0.0782
+Collected 1000 policy steps | episodes 1 | reward sum 37.72 | replay 104000
+Update 5400/20000 | world 0.0019 | actor -4.0840 | value 0.0237
+Collected 1000 policy steps | episodes 1 | reward sum 33.31 | replay 105000
+Update 5500/20000 | world 0.0015 | actor -4.3536 | value 0.0191
+Collected 1000 policy steps | episodes 1 | reward sum 37.43 | replay 106000
+Update 5600/20000 | world 0.0015 | actor -4.1263 | value 0.0350
+Collected 1000 policy steps | episodes 1 | reward sum 38.04 | replay 107000
+Update 5700/20000 | world 0.0024 | actor -4.6225 | value 0.0229
+Collected 1000 policy steps | episodes 1 | reward sum 34.65 | replay 108000
+Update 5800/20000 | world 0.0016 | actor -4.9422 | value 0.0382
+Collected 1000 policy steps | episodes 1 | reward sum 37.57 | replay 109000
+Update 5900/20000 | world 0.0016 | actor -4.4008 | value 0.0408
+Collected 1000 policy steps | episodes 1 | reward sum 50.08 | replay 110000
+Update 6000/20000 | world 0.0017 | actor -4.9905 | value 0.0382
+Collected 1000 policy steps | episodes 1 | reward sum 32.98 | replay 111000
+Update 6100/20000 | world 0.0016 | actor -5.3744 | value 0.0417
+Collected 1000 policy steps | episodes 1 | reward sum 20.02 | replay 112000
+Update 6200/20000 | world 0.0019 | actor -4.6060 | value 0.0291
+Collected 1000 policy steps | episodes 1 | reward sum 20.45 | replay 113000
+Update 6300/20000 | world 0.0018 | actor -5.5096 | value 0.0260
+Collected 1000 policy steps | episodes 1 | reward sum 40.51 | replay 114000
+Update 6400/20000 | world 0.0016 | actor -4.6758 | value 0.0193
+Collected 1000 policy steps | episodes 1 | reward sum 45.09 | replay 115000
+Update 6500/20000 | world 0.0041 | actor -4.5718 | value 0.0214
+Collected 1000 policy steps | episodes 1 | reward sum 31.70 | replay 116000
+Update 6600/20000 | world 0.0018 | actor -4.6759 | value 0.0181
+Collected 1000 policy steps | episodes 1 | reward sum 31.08 | replay 117000
+Update 6700/20000 | world 0.0023 | actor -4.2553 | value 0.0063
+Collected 1000 policy steps | episodes 1 | reward sum 31.79 | replay 118000
+Update 6800/20000 | world 0.0015 | actor -4.5111 | value 0.0218
+Collected 1000 policy steps | episodes 1 | reward sum 40.73 | replay 119000
+Update 6900/20000 | world 0.0015 | actor -4.9686 | value 0.0310
+Collected 1000 policy steps | episodes 1 | reward sum 44.22 | replay 120000
+Update 7000/20000 | world 0.0014 | actor -4.6731 | value 0.0192
+Collected 1000 policy steps | episodes 1 | reward sum 63.52 | replay 121000
+Update 7100/20000 | world 0.0018 | actor -5.5832 | value 0.0271
+Collected 1000 policy steps | episodes 1 | reward sum 39.05 | replay 122000
+Update 7200/20000 | world 0.0014 | actor -4.8587 | value 0.0166
+Collected 1000 policy steps | episodes 1 | reward sum 6.03 | replay 123000
+Update 7300/20000 | world 0.0018 | actor -5.5704 | value 0.0150
+Collected 1000 policy steps | episodes 1 | reward sum 47.09 | replay 124000
+Update 7400/20000 | world 0.0016 | actor -5.2107 | value 0.0572
+Collected 1000 policy steps | episodes 1 | reward sum 37.69 | replay 125000
+Update 7500/20000 | world 0.0014 | actor -5.1727 | value 0.0194
+Collected 1000 policy steps | episodes 1 | reward sum 36.83 | replay 126000
+Update 7600/20000 | world 0.0013 | actor -5.0855 | value 0.0218
+Collected 1000 policy steps | episodes 1 | reward sum 38.48 | replay 127000
+Update 7700/20000 | world 0.0014 | actor -4.3896 | value 0.0149
+Collected 1000 policy steps | episodes 1 | reward sum 33.31 | replay 128000
+Update 7800/20000 | world 0.0023 | actor -5.3812 | value 0.0212
+Collected 1000 policy steps | episodes 1 | reward sum 39.22 | replay 129000
+Update 7900/20000 | world 0.0013 | actor -5.2458 | value 0.0147
+Collected 1000 policy steps | episodes 1 | reward sum 65.60 | replay 130000
+Update 8000/20000 | world 0.0013 | actor -5.2400 | value 0.0277
+Collected 1000 policy steps | episodes 1 | reward sum 40.84 | replay 131000
+Update 8100/20000 | world 0.0015 | actor -4.9058 | value 0.0123
+Collected 1000 policy steps | episodes 1 | reward sum 8.46 | replay 132000
+Update 8200/20000 | world 0.0015 | actor -5.1776 | value 0.0208
+Collected 1000 policy steps | episodes 1 | reward sum 48.21 | replay 133000
+Update 8300/20000 | world 0.0014 | actor -5.3254 | value 0.0195
+Collected 1000 policy steps | episodes 1 | reward sum 38.06 | replay 134000
+Update 8400/20000 | world 0.0014 | actor -4.9757 | value 0.0138
+Collected 1000 policy steps | episodes 1 | reward sum 52.42 | replay 135000
+Update 8500/20000 | world 0.0018 | actor -6.1540 | value 0.0894
+Collected 1000 policy steps | episodes 1 | reward sum 51.90 | replay 136000
+Update 8600/20000 | world 0.6587 | actor -3.7720 | value 0.0207
+Collected 1000 policy steps | episodes 1 | reward sum 5.37 | replay 137000
+Update 8700/20000 | world 0.0060 | actor -3.6549 | value 0.0035
+Collected 1000 policy steps | episodes 1 | reward sum 33.45 | replay 138000
+Update 8800/20000 | world 0.0041 | actor -3.4245 | value 0.0028
+Collected 1000 policy steps | episodes 1 | reward sum 59.78 | replay 139000
+Update 8900/20000 | world 0.0042 | actor -3.4954 | value 0.0016
+Collected 1000 policy steps | episodes 1 | reward sum 51.01 | replay 140000
+Update 9000/20000 | world 0.0039 | actor -3.5597 | value 0.0022
+Collected 1000 policy steps | episodes 1 | reward sum 27.74 | replay 141000
+Update 9100/20000 | world 0.0040 | actor -3.5739 | value 0.0013
+Collected 1000 policy steps | episodes 1 | reward sum 46.88 | replay 142000
+Update 9200/20000 | world 0.0043 | actor -3.5574 | value 0.0013
+Collected 1000 policy steps | episodes 1 | reward sum 59.80 | replay 143000
+Update 9300/20000 | world 0.0034 | actor -3.6151 | value 0.0037
+Collected 1000 policy steps | episodes 1 | reward sum 54.92 | replay 144000
+Update 9400/20000 | world 0.0035 | actor -3.6497 | value 0.0008
+Collected 1000 policy steps | episodes 1 | reward sum 56.07 | replay 145000
+Update 9500/20000 | world 0.0037 | actor -3.7080 | value 0.0010
+Collected 1000 policy steps | episodes 1 | reward sum 75.13 | replay 146000
+Update 9600/20000 | world 0.0044 | actor -3.8636 | value 0.0016
+Collected 1000 policy steps | episodes 1 | reward sum 5.41 | replay 147000
+Update 9700/20000 | world 0.0073 | actor -3.8753 | value 0.0020
+Collected 1000 policy steps | episodes 1 | reward sum 61.07 | replay 148000
+Update 9800/20000 | world 0.0092 | actor -3.9057 | value 0.0022
+Collected 1000 policy steps | episodes 1 | reward sum 59.19 | replay 149000
+Update 9900/20000 | world 0.0041 | actor -3.9427 | value 0.0014
+Collected 1000 policy steps | episodes 1 | reward sum 5.00 | replay 150000
+Update 10000/20000 | world 0.0037 | actor -4.0133 | value 0.0020
+Collected 1000 policy steps | episodes 1 | reward sum 57.95 | replay 151000
+Update 10100/20000 | world 0.0033 | actor -3.9116 | value 0.0010
+Collected 1000 policy steps | episodes 1 | reward sum 57.63 | replay 152000
+Update 10200/20000 | world 0.0029 | actor -3.8876 | value 0.0013
+Collected 1000 policy steps | episodes 1 | reward sum 50.62 | replay 153000
+Update 10300/20000 | world 0.0036 | actor -4.0444 | value 0.0012
+Collected 1000 policy steps | episodes 1 | reward sum 51.31 | replay 154000
+Update 10400/20000 | world 0.0029 | actor -4.2307 | value 0.0015
+Collected 1000 policy steps | episodes 1 | reward sum 55.68 | replay 155000
+Update 10500/20000 | world 0.0060 | actor -4.2499 | value 0.0012
+Collected 1000 policy steps | episodes 1 | reward sum 6.54 | replay 156000
+Update 10600/20000 | world 0.0030 | actor -4.2609 | value 0.0011
+Collected 1000 policy steps | episodes 1 | reward sum 47.97 | replay 157000
+Update 10700/20000 | world 0.0034 | actor -4.1858 | value 0.0014
+Collected 1000 policy steps | episodes 1 | reward sum 5.70 | replay 158000
+Update 10800/20000 | world 0.0033 | actor -4.5407 | value 0.0020
+Collected 1000 policy steps | episodes 1 | reward sum 56.01 | replay 159000
+Update 10900/20000 | world 0.0028 | actor -4.1337 | value 0.0012
+Collected 1000 policy steps | episodes 1 | reward sum 13.63 | replay 160000

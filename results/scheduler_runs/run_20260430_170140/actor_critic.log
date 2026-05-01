@@ -1,0 +1,20 @@
+Saving all results to: /home/administrator/FYP/RL-baselines/results/actor_critic/run_20260430_170144
+Starting Actor-Critic training...
+Episode 50/1000 | Average Reward (last 50): 53.82
+Episode 100/1000 | Average Reward (last 50): 228.36
+Episode 150/1000 | Average Reward (last 50): 358.84
+Episode 200/1000 | Average Reward (last 50): 426.64
+Episode 250/1000 | Average Reward (last 50): 181.86
+Episode 300/1000 | Average Reward (last 50): 298.88
+Episode 350/1000 | Average Reward (last 50): 490.44
+Episode 400/1000 | Average Reward (last 50): 314.22
+Episode 450/1000 | Average Reward (last 50): 437.78
+Episode 500/1000 | Average Reward (last 50): 490.64
+Solved at episode 518!
+Model saved to /home/administrator/FYP/RL-baselines/results/actor_critic/run_20260430_170144/model.pth
+Plotting learning curve...
+Training curve saved as '/home/administrator/FYP/RL-baselines/results/actor_critic/run_20260430_170144/training_curve.png'
+Evaluating trained agent and recording video...
+Evaluation finished. Total Reward: 500.0
+Saving video as /home/administrator/FYP/RL-baselines/results/actor_critic/run_20260430_170144/cartpole_agent.gif...
+Saved successfully!

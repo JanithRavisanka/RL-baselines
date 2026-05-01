@@ -1,0 +1,113 @@
+A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138)
+[Powered by Stella]
+Saving all outputs to: /home/administrator/FYP/RL-baselines/results/dreamer_v3/run_20260430_223138
+Prefill: 2000/200000
+Prefill: 4000/200000
+Prefill: 6000/200000
+Prefill: 8000/200000
+Prefill: 10000/200000
+Prefill: 12000/200000
+Prefill: 14000/200000
+Prefill: 16000/200000
+Prefill: 18000/200000
+Prefill: 20000/200000
+Prefill: 22000/200000
+Prefill: 24000/200000
+Prefill: 26000/200000
+Prefill: 28000/200000
+Prefill: 30000/200000
+Prefill: 32000/200000
+Prefill: 34000/200000
+Prefill: 36000/200000
+Prefill: 38000/200000
+Prefill: 40000/200000
+Prefill: 42000/200000
+Prefill: 44000/200000
+Prefill: 46000/200000
+Prefill: 48000/200000
+Prefill: 50000/200000
+Prefill: 52000/200000
+Prefill: 54000/200000
+Prefill: 56000/200000
+Prefill: 58000/200000
+Prefill: 60000/200000
+Prefill: 62000/200000
+Prefill: 64000/200000
+Prefill: 66000/200000
+Prefill: 68000/200000
+Prefill: 70000/200000
+Prefill: 72000/200000
+Prefill: 74000/200000
+Prefill: 76000/200000
+Prefill: 78000/200000
+Prefill: 80000/200000
+Prefill: 82000/200000
+Prefill: 84000/200000
+Prefill: 86000/200000
+Prefill: 88000/200000
+Prefill: 90000/200000
+Prefill: 92000/200000
+Prefill: 94000/200000
+Prefill: 96000/200000
+Prefill: 98000/200000
+Prefill: 100000/200000
+Prefill: 102000/200000
+Prefill: 104000/200000
+Prefill: 106000/200000
+Prefill: 108000/200000
+Prefill: 110000/200000
+Prefill: 112000/200000
+Prefill: 114000/200000
+Prefill: 116000/200000
+Prefill: 118000/200000
+Prefill: 120000/200000
+Prefill: 122000/200000
+Prefill: 124000/200000
+Prefill: 126000/200000
+Prefill: 128000/200000
+Prefill: 130000/200000
+Prefill: 132000/200000
+Prefill: 134000/200000
+Prefill: 136000/200000
+Prefill: 138000/200000
+Prefill: 140000/200000
+Prefill: 142000/200000
+Prefill: 144000/200000
+Prefill: 146000/200000
+Prefill: 148000/200000
+Prefill: 150000/200000
+Prefill: 152000/200000
+Prefill: 154000/200000
+Prefill: 156000/200000
+Prefill: 158000/200000
+Prefill: 160000/200000
+Prefill: 162000/200000
+Prefill: 164000/200000
+Prefill: 166000/200000
+Prefill: 168000/200000
+Prefill: 170000/200000
+Prefill: 172000/200000
+Prefill: 174000/200000
+Prefill: 176000/200000
+Prefill: 178000/200000
+Prefill: 180000/200000
+Prefill: 182000/200000
+Prefill: 184000/200000
+Prefill: 186000/200000
+Prefill: 188000/200000
+Prefill: 190000/200000
+Prefill: 192000/200000
+Prefill: 194000/200000
+Prefill: 196000/200000
+Prefill: 198000/200000
+Traceback (most recent call last):
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/Dreamer-v3/dreamer_v3.py", line 456, in <module>
+    model, metrics = train(args)
+                     ^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/baselines/model-based/Dreamer-v3/dreamer_v3.py", line 301, in train
+    obs_loss = F.mse_loss(torch.sigmoid(recon), target_img)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/torch/nn/functional.py", line 3905, in mse_loss
+    return torch._C._nn.mse_loss(
+           ^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 96.00 MiB. GPU 0 has a total capacity of 15.63 GiB of which 23.44 MiB is free. Process 697243 has 226.00 MiB memory in use. Process 697242 has 230.00 MiB memory in use. Process 816444 has 6.17 GiB memory in use. Process 821988 has 4.87 GiB memory in use. Including non-PyTorch memory, this process has 4.09 GiB memory in use. Of the allocated memory 3.80 GiB is allocated by PyTorch, and 92.32 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

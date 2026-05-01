@@ -110,21 +110,21 @@ def build_jobs(repo_root: Path) -> List[Job]:
         Job(
             "dreamer_v1",
             repo_root / "baselines/model-based/Dreamer-v1/dreamer_v1.py",
-            gpu_vram_mb=500,     # ConvEncoder/Decoder + RSSM, pixel-based
+            gpu_vram_mb=6500,    # ConvEncoder/Decoder + RSSM, pixel-based
             cpu_weight=2,
             estimated_minutes=120,
         ),
         Job(
             "dreamer_v2",
             repo_root / "baselines/model-based/Dreamer-v2/dreamer_v2.py",
-            gpu_vram_mb=800,     # larger RSSM (deter=600, stoch=32x32)
+            gpu_vram_mb=5000,    # larger RSSM (deter=600, stoch=32x32)
             cpu_weight=2,
             estimated_minutes=240,
         ),
         Job(
             "dreamer_v3",
             repo_root / "baselines/model-based/Dreamer-v3/dreamer_v3.py",
-            gpu_vram_mb=1200,    # largest model (deter=1024, stoch=32x32)
+            gpu_vram_mb=4500,    # largest model (deter=1024, stoch=32x32)
             cpu_weight=3,
             estimated_minutes=360,
         ),
@@ -419,8 +419,9 @@ Examples:
                     if job.extra_args:
                         cmd.extend(job.extra_args)
 
-                    # Environment setup for GPU isolation
+                    # Environment setup for GPU isolation and unbuffered output
                     env = os.environ.copy()
+                    env["PYTHONUNBUFFERED"] = "1"
                     if job.gpu_vram_mb > 0:
                         env["CUDA_VISIBLE_DEVICES"] = "0"
                         env["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
