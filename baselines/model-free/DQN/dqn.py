@@ -21,6 +21,54 @@ else:
     device = torch.device("cpu")
 print(f"Using device: {device}")
 
+
+class DeepMindRMSprop(optim.Optimizer):
+    """
+    RMSProp variant used by the original DeepMind DQN implementation.
+
+    PyTorch's RMSprop applies eps outside the square root and omits the DQN
+    momentum accumulator unless configured separately. With eps=0.01, that is
+    not the optimizer used in the paper.
+    """
+    def __init__(self, params, lr=2.5e-4, alpha=0.95, momentum=0.95, eps=0.01):
+        defaults = dict(lr=lr, alpha=alpha, momentum=momentum, eps=eps)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            lr = group["lr"]
+            alpha = group["alpha"]
+            momentum = group["momentum"]
+            eps = group["eps"]
+
+            for param in group["params"]:
+                if param.grad is None:
+                    continue
+
+                grad = param.grad
+                state = self.state[param]
+
+                if len(state) == 0:
+                    state["square_avg"] = torch.zeros_like(param)
+                    state["momentum_buffer"] = torch.zeros_like(param)
+
+                square_avg = state["square_avg"]
+                momentum_buffer = state["momentum_buffer"]
+
+                square_avg.mul_(alpha).addcmul_(grad, grad, value=1.0 - alpha)
+                denom = square_avg.add(eps).sqrt()
+                momentum_buffer.mul_(momentum).addcdiv_(grad, denom, value=lr)
+                param.add_(momentum_buffer, alpha=-1.0)
+
+        return loss
+
+
 class QNetwork(nn.Module):
     """
     Deep Q-Network (DQN) architecture from the original DeepMind paper.
@@ -83,7 +131,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-def make_env(env_name="ALE/Breakout-v5", render_mode=None):
+def make_env(env_name="ALE/Breakout-v5", render_mode=None, terminal_on_life_loss=True):
     """
     Creates the Atari environment and applies the necessary Wrappers.
     """
@@ -93,7 +141,13 @@ def make_env(env_name="ALE/Breakout-v5", render_mode=None):
     # 1. Grayscale
     # 2. Resizes to 84x84
     # 3. Frameskip of 4 (Agent only plays every 4th frame, making it faster)
-    env = AtariPreprocessing(env, frame_skip=4, grayscale_obs=True, scale_obs=False, terminal_on_life_loss=True)
+    env = AtariPreprocessing(
+        env,
+        frame_skip=4,
+        grayscale_obs=True,
+        scale_obs=False,
+        terminal_on_life_loss=terminal_on_life_loss,
+    )
     
     # FrameStack stacks the last 4 frames together to give the agent a sense of motion
     env = FrameStackObservation(env, stack_size=4)
@@ -118,10 +172,7 @@ def train():
     target_network = QNetwork(action_dim).to(device)
     target_network.load_state_dict(q_network.state_dict()) # Copy weights initially
     
-    # Nature DQN used RMSProp with a target network and replay buffer. PyTorch's
-    # RMSprop is not byte-identical to the DeepMind optimizer, but this keeps the
-    # optimizer family and scale paper-oriented instead of using Adam.
-    optimizer = optim.RMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, eps=0.01)
+    optimizer = DeepMindRMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, momentum=0.95, eps=0.01)
     
     # Hyperparameters
     # Original DQN used 1M transitions with an optimized frame store. This repo
@@ -134,7 +185,9 @@ def train():
     # Epsilon-Greedy Scheduler (Starts at 100% random, decays to 10% random)
     epsilon_start = 1.0
     epsilon_end = 0.1
-    epsilon_decay_steps = 1_000_000
+    # The wrapper repeats each selected action for 4 Atari frames, so 250k
+    # agent decisions correspond to the paper's 1M-frame exploration anneal.
+    epsilon_decay_steps = 250_000
     epsilon = epsilon_start
     
     # Training Loop variables
@@ -262,19 +315,23 @@ def evaluate_and_record(model, save_dir):
 
     filename = os.path.join(save_dir, 'breakout_dqn_agent.gif')
     print(f"Evaluating agent and saving video to {filename}...")
-    env = make_env(render_mode='rgb_array')
+    env = make_env(render_mode='rgb_array', terminal_on_life_loss=False)
     state, _ = env.reset()
     frames = []
     
     done = False
     total_reward = 0
+    fire_action = 1
+    lives = env.unwrapped.ale.lives()
     
     with torch.no_grad():
         # Play one episode
         
         # Breakout requires a "FIRE" action (Action 1) to launch the ball at the start of a life.
         # If the untrained agent never picks FIRE, the game stalls forever. We force it here.
-        state, _, _, _, _ = env.step(1)
+        state, reward, terminated, truncated, _ = env.step(fire_action)
+        done = terminated or truncated
+        total_reward += reward
         frames.append(env.render())
         
         while not done:
@@ -291,6 +348,13 @@ def evaluate_and_record(model, save_dir):
             state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
+            new_lives = env.unwrapped.ale.lives()
+            if not done and new_lives < lives:
+                lives = new_lives
+                state, reward, terminated, truncated, _ = env.step(fire_action)
+                done = terminated or truncated
+                total_reward += reward
+                frames.append(env.render())
             
             if len(frames) > 500: # Breakout can get stuck if untrained, cap it to avoid huge GIFs
                 break

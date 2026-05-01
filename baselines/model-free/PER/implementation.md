@@ -29,7 +29,7 @@ Sampling returns transitions, tree indices, and IS weights.
 In training:
 
 - `beta` starts at `0.4`,
-- increases linearly to `1.0` over `250000` frames.
+- increases linearly to `1.0` over `250000` agent decisions.
 
 Higher beta later in training applies stronger bias correction when policy/value estimates become more sensitive.
 
@@ -53,3 +53,14 @@ After TD target computation:
   - `epsilon=0.01` prevents zero priority.
 
 Updating priorities every optimization step keeps replay aligned with current learning signal.
+
+## 6) Optimizer
+
+The Q-network uses the DeepMind DQN RMSProp variant:
+
+- learning rate `2.5e-4`,
+- squared-gradient decay `0.95`,
+- momentum `0.95`,
+- epsilon `0.01` inside the square root.
+
+This is intentionally not `torch.optim.RMSprop(..., eps=0.01)`, because PyTorch applies epsilon outside the square root and does not match the DeepMind DQN momentum update by default.

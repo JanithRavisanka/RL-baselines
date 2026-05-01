@@ -40,8 +40,10 @@ class Job:
     cpu_weight: int = 1         # 1 = light, 2 = medium, 4 = heavy
     estimated_minutes: int = 5  # rough expected runtime
     extra_args: Optional[List[str]] = None
-    # Result detection patterns (glob relative to results/<name>/)
-    result_patterns: List[str] = field(default_factory=lambda: ["model.pth"])
+    # Result detection patterns (glob relative to results/<name>/).
+    # Check tracked artifacts, because model checkpoints are intentionally
+    # ignored by git and are not present after a fresh clone/pull.
+    result_patterns: List[str] = field(default_factory=lambda: ["training_curve.png"])
 
 
 def build_jobs(repo_root: Path) -> List[Job]:
@@ -110,7 +112,6 @@ def build_jobs(repo_root: Path) -> List[Job]:
             gpu_vram_mb=0,       # Tabular, pure CPU
             cpu_weight=1,
             estimated_minutes=5,
-            result_patterns=["q_table.npy"],
         ),
         Job(
             "mpc",
@@ -118,7 +119,6 @@ def build_jobs(repo_root: Path) -> List[Job]:
             gpu_vram_mb=150,     # small ensemble of MLPs
             cpu_weight=2,
             estimated_minutes=20,
-            result_patterns=["dynamics_ensemble.pth"],
         ),
         Job(
             "muzero",
@@ -126,7 +126,6 @@ def build_jobs(repo_root: Path) -> List[Job]:
             gpu_vram_mb=250,     # MLP + MCTS (CPU-heavy)
             cpu_weight=4,
             estimated_minutes=240,
-            result_patterns=["muzero_network.pth"],
         ),
         Job(
             "dreamer_v1",

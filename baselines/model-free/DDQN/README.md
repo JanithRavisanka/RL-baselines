@@ -15,15 +15,17 @@ python baselines/model-free/DDQN/double_dqn.py
 - Script currently has no CLI flags.
 - Core defaults are defined in code:
   - env: `ALE/Breakout-v5`
-  - `max_frames=500000`
+  - `max_frames=1000000`
   - `batch_size=32`
   - `gamma=0.99`
-  - epsilon schedule: `1.0 -> 0.1` over `250000` frames
-  - target update frequency: every `1000` frames
+  - optimizer: DeepMind-style RMSProp (`lr=2.5e-4`, `alpha=0.95`, `momentum=0.95`, `eps=0.01`)
+  - replay warmup: `50000` transitions
+  - epsilon schedule: `1.0 -> 0.1` over `250000` agent decisions (`1M` Atari frames with `frame_skip=4`)
+  - target update frequency: every `10000` frames
 
 ## What the script does
 
-- Trains a Double DQN agent on `ALE/Breakout-v5` for up to 500k frames
+- Trains a Double DQN agent on `ALE/Breakout-v5` for up to 1M frames
 - Uses replay buffer, target network updates, epsilon decay, reward clipping, and Huber loss
 - Evaluates one greedy episode after training and exports a GIF
 

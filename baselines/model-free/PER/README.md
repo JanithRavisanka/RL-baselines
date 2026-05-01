@@ -15,11 +15,13 @@ python3 baselines/model-free/PER/per_ddqn.py
 - Script currently has no CLI flags.
 - Core defaults are defined in code:
   - env: `ALE/Breakout-v5`
-  - `max_frames=500000`
+  - `max_frames=1000000`
   - `batch_size=32`
-  - PER: `alpha=0.6`, `beta_start=0.4` annealed to `1.0`
-  - epsilon schedule: `1.0 -> 0.1` over `250000` frames
-  - target update frequency: every `1000` frames
+  - optimizer: DeepMind-style RMSProp (`lr=2.5e-4`, `alpha=0.95`, `momentum=0.95`, `eps=0.01`)
+  - replay warmup: `50000` transitions
+  - PER: `alpha=0.6`, `beta_start=0.4` annealed to `1.0` over `250000` agent decisions
+  - epsilon schedule: `1.0 -> 0.1` over `250000` agent decisions (`1M` Atari frames with `frame_skip=4`)
+  - target update frequency: every `10000` frames
 
 ## Expected console output
 
@@ -28,8 +30,8 @@ You should see logs similar to:
 ```text
 Using device: cuda
 Saving all results to: /home/administrator/baselines/results/per_ddqn/run_YYYYMMDD_HHMMSS
-Starting Prioritized Double DQN (PER DDQN) Training for 500000 frames...
-Frame: 2000/500000 | Epsilon: 0.99 | Avg Reward (Last 20): ...
+Starting Prioritized Double DQN (PER DDQN) Training for 1000000 frames...
+Frame: 2000/1000000 | Epsilon: 1.00 | Avg Reward (Last 20): ...
 ...
 Model saved to /home/administrator/baselines/results/per_ddqn/run_YYYYMMDD_HHMMSS/model.pth
 Training curve saved as '/home/administrator/baselines/results/per_ddqn/run_YYYYMMDD_HHMMSS/training_curve.png'

@@ -20,6 +20,54 @@ else:
     device = torch.device("cpu")
 print(f"Using device: {device}")
 
+
+class DeepMindRMSprop(optim.Optimizer):
+    """
+    RMSProp variant used by the original DeepMind DQN implementation.
+
+    PyTorch's RMSprop applies eps outside the square root and omits the DQN
+    momentum accumulator unless configured separately. With eps=0.01, that is
+    not the optimizer used in the paper.
+    """
+    def __init__(self, params, lr=2.5e-4, alpha=0.95, momentum=0.95, eps=0.01):
+        defaults = dict(lr=lr, alpha=alpha, momentum=momentum, eps=eps)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            lr = group["lr"]
+            alpha = group["alpha"]
+            momentum = group["momentum"]
+            eps = group["eps"]
+
+            for param in group["params"]:
+                if param.grad is None:
+                    continue
+
+                grad = param.grad
+                state = self.state[param]
+
+                if len(state) == 0:
+                    state["square_avg"] = torch.zeros_like(param)
+                    state["momentum_buffer"] = torch.zeros_like(param)
+
+                square_avg = state["square_avg"]
+                momentum_buffer = state["momentum_buffer"]
+
+                square_avg.mul_(alpha).addcmul_(grad, grad, value=1.0 - alpha)
+                denom = square_avg.add(eps).sqrt()
+                momentum_buffer.mul_(momentum).addcdiv_(grad, denom, value=lr)
+                param.add_(momentum_buffer, alpha=-1.0)
+
+        return loss
+
+
 class QNetwork(nn.Module):
     # Same as DDQN
     def __init__(self, action_dim):
@@ -172,9 +220,15 @@ class PrioritizedReplayBuffer:
     def __len__(self):
         return self.size
 
-def make_env(env_name="ALE/Breakout-v5", render_mode=None):
+def make_env(env_name="ALE/Breakout-v5", render_mode=None, terminal_on_life_loss=True):
     env = gym.make(env_name, render_mode=render_mode, frameskip=1)
-    env = AtariPreprocessing(env, frame_skip=4, grayscale_obs=True, scale_obs=False, terminal_on_life_loss=True)
+    env = AtariPreprocessing(
+        env,
+        frame_skip=4,
+        grayscale_obs=True,
+        scale_obs=False,
+        terminal_on_life_loss=terminal_on_life_loss,
+    )
     env = FrameStackObservation(env, stack_size=4)
     return env
 
@@ -194,7 +248,7 @@ def train():
     target_network = QNetwork(action_dim).to(device)
     target_network.load_state_dict(q_network.state_dict())
     
-    optimizer = optim.RMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, eps=0.01)
+    optimizer = DeepMindRMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, momentum=0.95, eps=0.01)
     
     # Hyperparameters
     # Directly storing stacked frames makes the paper's 1M replay buffer very
@@ -205,12 +259,14 @@ def train():
     
     epsilon_start = 1.0
     epsilon_end = 0.1
-    epsilon_decay_steps = 1_000_000
+    # The wrapper repeats each selected action for 4 Atari frames, so 250k
+    # agent decisions correspond to the paper's 1M-frame exploration anneal.
+    epsilon_decay_steps = 250_000
     epsilon = epsilon_start
     
     # Beta annealing for Importance Sampling
     beta_start = 0.4
-    beta_frames = 1_000_000
+    beta_frames = 250_000
     beta_by_frame = lambda frame_idx: min(1.0, beta_start + frame_idx * (1.0 - beta_start) / beta_frames)
     
     max_frames = 1_000_000
@@ -331,14 +387,18 @@ def evaluate_and_record(model, save_dir):
 
     filename = os.path.join(save_dir, 'breakout_per_ddqn_agent.gif')
     print(f"Evaluating agent and saving video to {filename}...")
-    env = make_env(render_mode='rgb_array')
+    env = make_env(render_mode='rgb_array', terminal_on_life_loss=False)
     state, _ = env.reset()
     frames = []
     done = False
     total_reward = 0
+    fire_action = 1
+    lives = env.unwrapped.ale.lives()
     
     with torch.no_grad():
-        state, _, _, _, _ = env.step(1)
+        state, reward, terminated, truncated, _ = env.step(fire_action)
+        done = terminated or truncated
+        total_reward += reward
         frames.append(env.render())
         
         while not done:
@@ -349,6 +409,13 @@ def evaluate_and_record(model, save_dir):
             state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
+            new_lives = env.unwrapped.ale.lives()
+            if not done and new_lives < lives:
+                lives = new_lives
+                state, reward, terminated, truncated, _ = env.step(fire_action)
+                done = terminated or truncated
+                total_reward += reward
+                frames.append(env.render())
             if len(frames) > 500: 
                 break
                 

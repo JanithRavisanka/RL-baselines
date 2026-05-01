@@ -34,9 +34,10 @@ This maps the current implementation in `dqn.py` to concrete components and beha
 
 ### Replay and Learning
 
-- Replay capacity: `50_000`.
+- Optimizer: DeepMind-style RMSProp (`lr=2.5e-4`, `alpha=0.95`, `momentum=0.95`, `eps=0.01`, eps inside the square root).
+- Replay capacity: `100_000`.
 - Batch size: `32`.
-- Starts gradient updates once replay size exceeds batch size.
+- Starts gradient updates after `50_000` replay transitions.
 - Sampled tensors:
   - states/next_states converted to float and normalized to `[0,1]`,
   - actions gathered via `gather(1, actions_tensor)`.
@@ -53,7 +54,7 @@ This maps the current implementation in `dqn.py` to concrete components and beha
 
 ### Target Network Update
 
-- Hard update every `1000` frames:
+- Hard update every `10000` frames:
   - `target_network.load_state_dict(q_network.state_dict())`.
 - Initialized as a full copy of online network before training begins.
 

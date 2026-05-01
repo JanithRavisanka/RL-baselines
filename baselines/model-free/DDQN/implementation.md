@@ -17,6 +17,7 @@
 ## What is different from `DQN/dqn.py`
 
 Almost everything is intentionally the same (env setup, architecture, optimizer, hyperparameters, logging cadence, saving flow).  
+The optimizer is the DeepMind DQN RMSProp variant (`lr=2.5e-4`, `alpha=0.95`, `momentum=0.95`, `eps=0.01` inside the square root), not `torch.optim.RMSprop(..., eps=0.01)`.
 The core algorithmic difference is the target calculation inside training:
 
 - **DQN (`dqn.py`)**:  
