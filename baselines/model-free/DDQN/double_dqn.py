@@ -8,8 +8,6 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
-import imageio
-import matplotlib.pyplot as plt
 import os
 import datetime
 from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
@@ -120,22 +118,25 @@ def train():
     target_network = QNetwork(action_dim).to(device)
     target_network.load_state_dict(q_network.state_dict()) # Copy weights initially
     
-    optimizer = optim.Adam(q_network.parameters(), lr=1e-4)
+    optimizer = optim.RMSprop(q_network.parameters(), lr=2.5e-4, alpha=0.95, eps=0.01)
     
     # Hyperparameters
-    replay_buffer = ReplayBuffer(capacity=50000) # Increased capacity for better memory
+    # Directly storing stacked frames makes the paper's 1M replay buffer very
+    # memory-heavy here; 100k keeps the same replay mechanism for this baseline.
+    replay_buffer = ReplayBuffer(capacity=100_000)
     batch_size = 32
     gamma = 0.99
     
     # Epsilon-Greedy Scheduler (Starts at 100% random, decays to 10% random)
     epsilon_start = 1.0
     epsilon_end = 0.1
-    epsilon_decay_steps = 250000 # Decay over 250k frames
+    epsilon_decay_steps = 1_000_000
     epsilon = epsilon_start
     
     # Training Loop variables
-    max_frames = 500000 # Increased to 500k frames (will take some time, but agent will learn)
-    target_update_frequency = 1000 # How often to copy Q-Net weights to Target-Net
+    max_frames = 1_000_000
+    learning_starts = 50_000
+    target_update_frequency = 10_000
     
     frame_idx = 0
     episode_rewards = []
@@ -183,7 +184,7 @@ def train():
         
         # --- 4. Learn from Replay Buffer ---
         # Only start learning once we have enough memories in the buffer
-        if len(replay_buffer) > batch_size:
+        if len(replay_buffer) >= batch_size and frame_idx >= learning_starts:
             # Sample a random batch of memories
             states_b, actions_b, rewards_b, next_states_b, dones_b = replay_buffer.sample(batch_size)
             
@@ -236,6 +237,8 @@ def train():
 
 
 def plot_rewards(rewards, save_dir):
+    import matplotlib.pyplot as plt
+
     plt.figure(figsize=(10, 5))
     plt.plot(rewards, alpha=0.6)
     plt.title('Double DQN Training on Breakout-v5')
@@ -254,6 +257,8 @@ def plot_rewards(rewards, save_dir):
     print(f"Training curve saved as '{save_path}'")
 
 def evaluate_and_record(model, save_dir):
+    import imageio
+
     filename = os.path.join(save_dir, 'breakout_ddqn_agent.gif')
     print(f"Evaluating agent and saving video to {filename}...")
     env = make_env(render_mode='rgb_array')
