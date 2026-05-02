@@ -20,6 +20,9 @@ This repository contains multiple model-free and model-based RL algorithm implem
   - Dreamer V1 (`dm_control/walker-walk-v0`)
   - Dreamer V2 (`ALE/Breakout-v5`)
   - Dreamer V3 (`ALE/Breakout-v5`)
+- Proposed method:
+  - LeCun-AMI prototype (`Pendulum-v1`)
+  - LeCun-AMI Atari prototype (`ALE/Breakout-v5`)
 
 ## Setup
 
@@ -115,6 +118,18 @@ python baselines/model-based/Dreamer-v2/dreamer_v2.py --env ALE/Breakout-v5
 - Dreamer V3 (compact paper-oriented world model + continuation head):
 ```bash
 python baselines/model-based/Dreamer-v3/dreamer_v3.py --env ALE/Breakout-v5
+```
+
+### Proposed Method
+
+- LeCun-AMI prototype:
+```bash
+python proposed/lecun_ami/lecun_ami.py
+```
+
+- LeCun-AMI Atari prototype:
+```bash
+python proposed/lecun_ami/lecun_ami_atari.py --env ALE/Breakout-v5
 ```
 
 ### Dreamer Dependencies (target environments)
