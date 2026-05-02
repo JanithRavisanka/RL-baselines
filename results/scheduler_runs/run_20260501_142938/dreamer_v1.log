@@ -407,3 +407,50 @@ Collected 1000 policy steps | episodes 1 | reward sum 61.62 | replay 228000
 Update 17800/20000 | world 0.0036 | actor -5.6959 | value 0.0469
 Collected 1000 policy steps | episodes 1 | reward sum 88.68 | replay 229000
 Update 17900/20000 | world 0.0029 | actor -5.0670 | value 0.0235
+Collected 1000 policy steps | episodes 1 | reward sum 56.09 | replay 230000
+Update 18000/20000 | world 0.0038 | actor -6.1509 | value 0.1021
+Collected 1000 policy steps | episodes 1 | reward sum 58.85 | replay 231000
+Update 18100/20000 | world 0.0037 | actor -4.4545 | value 0.0162
+Collected 1000 policy steps | episodes 1 | reward sum 52.47 | replay 232000
+Update 18200/20000 | world 0.0053 | actor -6.5777 | value 0.1516
+Collected 1000 policy steps | episodes 1 | reward sum 64.77 | replay 233000
+Update 18300/20000 | world 0.0046 | actor -6.1670 | value 0.0836
+Collected 1000 policy steps | episodes 1 | reward sum 55.90 | replay 234000
+Update 18400/20000 | world 0.0036 | actor -6.4238 | value 0.1106
+Collected 1000 policy steps | episodes 1 | reward sum 52.41 | replay 235000
+Update 18500/20000 | world 0.0051 | actor -7.1457 | value 0.1117
+Collected 1000 policy steps | episodes 1 | reward sum 59.83 | replay 236000
+Update 18600/20000 | world 0.0039 | actor -6.7245 | value 0.0963
+Collected 1000 policy steps | episodes 1 | reward sum 81.17 | replay 237000
+Update 18700/20000 | world 0.0033 | actor -4.8245 | value 0.0775
+Collected 1000 policy steps | episodes 1 | reward sum 69.74 | replay 238000
+Update 18800/20000 | world 0.0038 | actor -7.2097 | value 0.1300
+Collected 1000 policy steps | episodes 1 | reward sum 75.86 | replay 239000
+Update 18900/20000 | world 0.0059 | actor -7.3773 | value 0.2114
+Collected 1000 policy steps | episodes 1 | reward sum 65.93 | replay 240000
+Update 19000/20000 | world 0.0040 | actor -5.8875 | value 0.0805
+Collected 1000 policy steps | episodes 1 | reward sum 66.26 | replay 241000
+Update 19100/20000 | world 0.0036 | actor -6.2414 | value 0.0603
+Collected 1000 policy steps | episodes 1 | reward sum 80.02 | replay 242000
+Update 19200/20000 | world 0.0033 | actor -6.3855 | value 0.0776
+Collected 1000 policy steps | episodes 1 | reward sum 50.58 | replay 243000
+Update 19300/20000 | world 0.0029 | actor -7.4307 | value 0.1421
+Collected 1000 policy steps | episodes 1 | reward sum 49.60 | replay 244000
+Update 19400/20000 | world 0.0030 | actor -6.7754 | value 0.0956
+Collected 1000 policy steps | episodes 1 | reward sum 71.60 | replay 245000
+Update 19500/20000 | world 0.0039 | actor -7.7910 | value 0.1036
+Collected 1000 policy steps | episodes 1 | reward sum 76.86 | replay 246000
+Update 19600/20000 | world 0.0032 | actor -8.0315 | value 0.1534
+Collected 1000 policy steps | episodes 1 | reward sum 72.21 | replay 247000
+Update 19700/20000 | world 0.0033 | actor -10.0115 | value 0.1101
+Collected 1000 policy steps | episodes 1 | reward sum 74.94 | replay 248000
+Update 19800/20000 | world 0.0035 | actor -7.5090 | value 0.1037
+Collected 1000 policy steps | episodes 1 | reward sum 68.39 | replay 249000
+Update 19900/20000 | world 0.0039 | actor -8.3990 | value 0.1426
+Collected 1000 policy steps | episodes 1 | reward sum 56.45 | replay 250000
+Model saved: /home/administrator/FYP/RL-baselines/results/dreamer_v1/run_20260501_142941/model.pth
+Training curve saved: /home/administrator/FYP/RL-baselines/results/dreamer_v1/run_20260501_142941/training_curve.png
+/home/administrator/FYP/RL-baselines/venv/lib/python3.12/site-packages/imageio/plugins/pillow.py:410: DeprecationWarning: The keyword `fps` is no longer supported. Use `duration`(in ms) instead, e.g. `fps=50` == `duration=20` (1000 * 1/50).
+  warnings.warn(
+Evaluation GIF saved: /home/administrator/FYP/RL-baselines/results/dreamer_v1/run_20260501_142941/dreamer_v1_agent.gif
+Evaluation reward: 43.62
