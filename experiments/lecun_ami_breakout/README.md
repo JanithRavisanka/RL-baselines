@@ -77,11 +77,32 @@ baselines because their current environments differ: Dreamer V1 uses
 and Dyna-Q uses `CliffWalking-v1`.
 
 The current baseline scripts produce plots/GIFs and scheduler logs, while AMI
-produces structured `eval_metrics.csv` and final JSON summaries. The summary
-script therefore reports baseline artifact availability and log-derived reward
-values, but AMI-to-baseline comparisons should mention this difference unless
-the baseline scripts are upgraded to emit matching periodic evaluation CSV
-files.
+produces structured `eval_metrics.csv` and final JSON summaries.
+
+The model-free Breakout baselines now also write structured outputs:
+
+- `config.json`
+- `metrics.csv`
+- `training_log.csv`
+- `eval_metrics.csv`
+- `final_eval_metrics.json`
+- `final_summary.json`
+
+Example smoke command:
+
+```bash
+python baselines/model-free/DQN/dqn.py \
+  --max-frames 1000 \
+  --learning-starts 2000 \
+  --eval-interval 0 \
+  --eval-episodes 1 \
+  --eval-max-steps 500 \
+  --no-plots \
+  --no-gif
+```
+
+Dreamer V2/V3 still need the same structured reporting upgrade. Until then,
+the summary script reports them from artifact availability and scheduler logs.
 
 ## 4. Report Tables
 
@@ -114,4 +135,11 @@ partial or interrupted runs too:
 
 ```bash
 python experiments/lecun_ami_breakout/summarize_results.py --include-incomplete
+```
+
+Tiny structured baseline smoke runs are ignored by default in the baseline
+availability table. To include shorter baseline runs:
+
+```bash
+python experiments/lecun_ami_breakout/summarize_results.py --baseline-min-steps 1
 ```

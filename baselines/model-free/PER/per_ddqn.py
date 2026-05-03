@@ -9,7 +9,24 @@ import numpy as np
 import random
 import os
 import datetime
+import argparse
+import sys
+import time
 from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from atari_reporting import (  # noqa: E402
+    EPISODE_FIELDS,
+    EVAL_FIELDS,
+    TRAINING_FIELDS,
+    append_csv_row,
+    ensure_csv,
+    evaluate_q_policy,
+    seed_everything,
+    write_config,
+    write_final_summary,
+    write_json,
+)
 
 # Set up Hardware Acceleration
 if torch.cuda.is_available():
@@ -232,7 +249,7 @@ def make_env(env_name="ALE/Breakout-v5", render_mode=None, terminal_on_life_loss
     env = FrameStackObservation(env, stack_size=4)
     return env
 
-def train():
+def train(args, save_dir):
     """
     PER + Double DQN.
 
@@ -241,7 +258,8 @@ def train():
     - PER focuses updates on transitions with higher TD error signal.
     - IS weights keep training approximately unbiased as beta -> 1.
     """
-    env = make_env()
+    env = make_env(args.env)
+    seed_everything(args.seed, env)
     action_dim = env.action_space.n
     
     q_network = QNetwork(action_dim).to(device)
@@ -253,28 +271,37 @@ def train():
     # Hyperparameters
     # Directly storing stacked frames makes the paper's 1M replay buffer very
     # memory-heavy here; 100k keeps the prioritized replay mechanism practical.
-    replay_buffer = PrioritizedReplayBuffer(capacity=100_000, alpha=0.6)
-    batch_size = 32
-    gamma = 0.99
+    replay_buffer = PrioritizedReplayBuffer(capacity=args.replay_size, alpha=args.priority_alpha)
+    batch_size = args.batch_size
+    gamma = args.gamma
     
-    epsilon_start = 1.0
-    epsilon_end = 0.1
+    epsilon_start = args.epsilon_start
+    epsilon_end = args.epsilon_end
     # The wrapper repeats each selected action for 4 Atari frames, so 250k
     # agent decisions correspond to the paper's 1M-frame exploration anneal.
-    epsilon_decay_steps = 250_000
+    epsilon_decay_steps = args.epsilon_decay_steps
     epsilon = epsilon_start
     
     # Beta annealing for Importance Sampling
-    beta_start = 0.4
-    beta_frames = 250_000
+    beta_start = args.priority_beta_start
+    beta_frames = args.priority_beta_frames
     beta_by_frame = lambda frame_idx: min(1.0, beta_start + frame_idx * (1.0 - beta_start) / beta_frames)
     
-    max_frames = 1_000_000
-    learning_starts = 50_000
-    target_update_frequency = 10_000
+    max_frames = args.max_frames
+    learning_starts = args.learning_starts
+    target_update_frequency = args.target_update_frequency
     
     frame_idx = 0
     episode_rewards = []
+    episode_index = 0
+    episode_steps = 0
+    start_time = time.time()
+    metrics_path = os.path.join(save_dir, "metrics.csv")
+    training_log_path = os.path.join(save_dir, "training_log.csv")
+    eval_metrics_path = os.path.join(save_dir, "eval_metrics.csv")
+    ensure_csv(metrics_path, EPISODE_FIELDS)
+    ensure_csv(training_log_path, TRAINING_FIELDS)
+    ensure_csv(eval_metrics_path, EVAL_FIELDS)
     
     state, _ = env.reset()
     episode_reward = 0
@@ -301,11 +328,27 @@ def train():
         
         state = next_state
         episode_reward += reward
+        episode_steps += 1
         
         if done:
+            episode_index += 1
+            append_csv_row(
+                metrics_path,
+                EPISODE_FIELDS,
+                {
+                    "episode": episode_index,
+                    "global_step": frame_idx,
+                    "reward": episode_reward,
+                    "episode_steps": episode_steps,
+                    "epsilon": epsilon,
+                    "completed": 1,
+                    "elapsed_sec": time.time() - start_time,
+                },
+            )
             state, _ = env.reset()
             episode_rewards.append(episode_reward)
             episode_reward = 0
+            episode_steps = 0
             
         # 3. Decay Epsilon
         epsilon = max(epsilon_end, epsilon_start - (epsilon_start - epsilon_end) * (frame_idx / epsilon_decay_steps))
@@ -354,9 +397,61 @@ def train():
         if frame_idx % target_update_frequency == 0:
             target_network.load_state_dict(q_network.state_dict())
             
-        if frame_idx % 2000 == 0:
+        if args.eval_interval > 0 and frame_idx % args.eval_interval == 0:
+            eval_stats = evaluate_q_policy(
+                q_network,
+                make_env,
+                device,
+                args.env,
+                frame_idx,
+                args.eval_episodes,
+                args.eval_max_steps,
+                record_gif=False,
+            )
+            append_csv_row(eval_metrics_path, EVAL_FIELDS, eval_stats)
+            print(
+                f"Eval at frame {frame_idx}: "
+                f"mean={eval_stats['eval_reward_mean']:.2f}, "
+                f"max={eval_stats['eval_reward_max']:.2f}"
+            )
+
+        if args.checkpoint_interval > 0 and frame_idx % args.checkpoint_interval == 0:
+            checkpoint_path = os.path.join(save_dir, f"checkpoint_frame_{frame_idx}.pth")
+            torch.save(q_network.state_dict(), checkpoint_path)
+            print(f"Checkpoint saved to {checkpoint_path}")
+
+        if frame_idx % args.log_interval == 0:
             avg_reward = np.mean(episode_rewards[-20:]) if episode_rewards else 0.0
+            append_csv_row(
+                training_log_path,
+                TRAINING_FIELDS,
+                {
+                    "global_step": frame_idx,
+                    "elapsed_sec": time.time() - start_time,
+                    "episodes": len(episode_rewards),
+                    "epsilon": epsilon,
+                    "avg_reward_20": avg_reward,
+                    "avg_reward_100": np.mean(episode_rewards[-100:]) if episode_rewards else 0.0,
+                },
+            )
             print(f"Frame: {frame_idx}/{max_frames} | Epsilon: {epsilon:.2f} | Avg Reward (Last 20): {avg_reward:.2f}")
+
+    if episode_steps > 0:
+        episode_index += 1
+        episode_rewards.append(episode_reward)
+        append_csv_row(
+            metrics_path,
+            EPISODE_FIELDS,
+            {
+                "episode": episode_index,
+                "global_step": frame_idx,
+                "reward": episode_reward,
+                "episode_steps": episode_steps,
+                "epsilon": epsilon,
+                "completed": 0,
+                "elapsed_sec": time.time() - start_time,
+            },
+        )
 
     env.close()
     return q_network, episode_rewards
@@ -382,60 +477,71 @@ def plot_rewards(rewards, save_dir):
     plt.savefig(save_path)
     print(f"Training curve saved as '{save_path}'")
 
-def evaluate_and_record(model, save_dir):
-    import imageio
-
+def evaluate_and_record(model, args, save_dir):
     filename = os.path.join(save_dir, 'breakout_per_ddqn_agent.gif')
-    print(f"Evaluating agent and saving video to {filename}...")
-    env = make_env(render_mode='rgb_array', terminal_on_life_loss=False)
-    state, _ = env.reset()
-    frames = []
-    done = False
-    total_reward = 0
-    fire_action = 1
-    lives = env.unwrapped.ale.lives()
-    
-    with torch.no_grad():
-        state, reward, terminated, truncated, _ = env.step(fire_action)
-        done = terminated or truncated
-        total_reward += reward
-        frames.append(env.render())
-        
-        while not done:
-            frames.append(env.render()) 
-            state_tensor = torch.FloatTensor(np.array(state)).unsqueeze(0).to(device) / 255.0
-            q_values = model(state_tensor)
-            action = q_values.argmax().item()
-            state, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            total_reward += reward
-            new_lives = env.unwrapped.ale.lives()
-            if not done and new_lives < lives:
-                lives = new_lives
-                state, reward, terminated, truncated, _ = env.step(fire_action)
-                done = terminated or truncated
-                total_reward += reward
-                frames.append(env.render())
-            if len(frames) > 500: 
-                break
-                
-    env.close()
-    print(f"Evaluation finished. Total Reward: {total_reward}")
-    imageio.mimsave(filename, frames, fps=30)
-    print("Saved successfully!")
+    stats = evaluate_q_policy(
+        model,
+        make_env,
+        device,
+        args.env,
+        args.max_frames,
+        args.eval_episodes,
+        args.eval_max_steps,
+        record_gif=not args.no_gif,
+        gif_path="" if args.no_gif else filename,
+    )
+    write_json(os.path.join(save_dir, "final_eval_metrics.json"), stats)
+    append_csv_row(os.path.join(save_dir, "eval_metrics.csv"), EVAL_FIELDS, stats)
+    print(f"Final evaluation mean over {args.eval_episodes}: {stats['eval_reward_mean']:.2f}")
+    if not args.no_gif:
+        print(f"Saved evaluation GIF to {filename}")
+    return stats
+
+
+def build_args():
+    parser = argparse.ArgumentParser(description="PER Double DQN baseline for ALE/Breakout-v5")
+    parser.add_argument("--env", type=str, default="ALE/Breakout-v5")
+    parser.add_argument("--max-frames", type=int, default=1_000_000)
+    parser.add_argument("--replay-size", type=int, default=100_000)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--epsilon-start", type=float, default=1.0)
+    parser.add_argument("--epsilon-end", type=float, default=0.1)
+    parser.add_argument("--epsilon-decay-steps", type=int, default=250_000)
+    parser.add_argument("--learning-starts", type=int, default=50_000)
+    parser.add_argument("--target-update-frequency", type=int, default=10_000)
+    parser.add_argument("--priority-alpha", type=float, default=0.6)
+    parser.add_argument("--priority-beta-start", type=float, default=0.4)
+    parser.add_argument("--priority-beta-frames", type=int, default=250_000)
+    parser.add_argument("--eval-episodes", type=int, default=5)
+    parser.add_argument("--eval-max-steps", type=int, default=2000)
+    parser.add_argument("--eval-interval", type=int, default=50_000)
+    parser.add_argument("--checkpoint-interval", type=int, default=0)
+    parser.add_argument("--log-interval", type=int, default=2000)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--no-plots", action="store_true")
+    parser.add_argument("--no-gif", action="store_true")
+    parser.add_argument("--no-final-eval", action="store_true")
+    return parser.parse_args()
 
 if __name__ == '__main__':
+    args = build_args()
+    seed_everything(args.seed)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     save_dir = os.path.join(base_dir, "results", "per_ddqn", f"run_{timestamp}")
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
+    write_config(args, save_dir, "per_ddqn", device)
 
-    model, rewards = train()
+    model, rewards = train(args, save_dir)
     
     model_path = os.path.join(save_dir, "model.pth")
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to {model_path}")
 
-    plot_rewards(rewards, save_dir)
-    evaluate_and_record(model, save_dir)
+    write_final_summary(os.path.join(save_dir, "final_summary.json"), rewards, args.max_frames)
+    if not args.no_plots:
+        plot_rewards(rewards, save_dir)
+    if not args.no_final_eval:
+        evaluate_and_record(model, args, save_dir)

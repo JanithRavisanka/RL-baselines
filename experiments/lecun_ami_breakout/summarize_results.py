@@ -124,6 +124,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Include runs that do not have final_summary.json/model.pth yet.",
     )
+    parser.add_argument(
+        "--baseline-min-steps",
+        type=int,
+        default=500_000,
+        help="Ignore structured baseline smoke runs below this many training steps.",
+    )
     return parser.parse_args()
 
 
@@ -425,42 +431,108 @@ def parse_baseline_log(algo: str) -> dict[str, Any]:
     return best
 
 
-def baseline_rows() -> list[dict[str, Any]]:
+def baseline_run_steps(run_dir: Path) -> int | None:
+    config_doc = read_json(run_dir / "config.json")
+    config = config_doc.get("config", config_doc)
+    final_summary = read_json(run_dir / "final_summary.json")
+    for value in (
+        config.get("max_frames"),
+        config.get("total_steps"),
+        final_summary.get("total_steps"),
+    ):
+        steps = to_int(value, default=-1)
+        if steps >= 0:
+            return steps
+    return None
+
+
+def eligible_result_dirs(run_dirs: list[Path], min_steps: int) -> list[Path]:
+    eligible = []
+    for run_dir in run_dirs:
+        steps = baseline_run_steps(run_dir)
+        if steps is None or steps >= min_steps:
+            eligible.append(run_dir)
+    return eligible
+
+
+def structured_baseline_run(run_dirs: list[Path], min_steps: int) -> Path | None:
+    structured = []
+    for run_dir in run_dirs:
+        steps = baseline_run_steps(run_dir)
+        if steps is None or steps < min_steps:
+            continue
+        if (run_dir / "config.json").exists() and (run_dir / "final_summary.json").exists():
+            structured.append(run_dir)
+    return structured[-1] if structured else None
+
+
+def structured_baseline_metrics(run_dir: Path | None) -> dict[str, Any]:
+    if run_dir is None:
+        return {}
+    final_eval = read_json(run_dir / "final_eval_metrics.json")
+    final_summary = read_json(run_dir / "final_summary.json")
+    eval_row = read_last_csv_row(run_dir / "eval_metrics.csv")
+    training_row = read_last_csv_row(run_dir / "training_log.csv")
+    steps = baseline_run_steps(run_dir)
+    return {
+        "steps": steps,
+        "final_avg_reward_last_20": final_summary.get("reward_last_20_mean"),
+        "final_eval_reward": final_eval.get("eval_reward_mean") or eval_row.get("eval_reward_mean"),
+        "last_logged_frame": steps,
+        "total_frames": steps,
+        "elapsed_sec": training_row.get("elapsed_sec"),
+    }
+
+
+def baseline_rows(min_steps: int) -> list[dict[str, Any]]:
     rows = []
     for algo, info in BASELINES.items():
         algo_dir = RESULTS_ROOT / algo
         run_dirs = sorted(path for path in algo_dir.glob("run_*") if path.is_dir()) if algo_dir.exists() else []
-        latest_run = run_dirs[-1] if run_dirs else None
+        eligible_dirs = eligible_result_dirs(run_dirs, min_steps)
+        structured_run = structured_baseline_run(run_dirs, min_steps)
+        latest_run = structured_run or (eligible_dirs[-1] if eligible_dirs else None)
         log = parse_baseline_log(algo)
+        structured = structured_baseline_metrics(structured_run)
+        source = "structured" if structured else ("scheduler_log" if log else "")
+        last_logged_frame = structured.get("last_logged_frame") or ("" if not log else log.get("last_frame", ""))
+        total_frames = structured.get("total_frames") or ("" if not log else log.get("total_frames", ""))
+        final_avg_reward_last_20 = structured.get("final_avg_reward_last_20")
+        if final_avg_reward_last_20 in (None, "") and log:
+            final_avg_reward_last_20 = log.get("final_avg_reward_last_20", "")
+        final_eval_reward = structured.get("final_eval_reward")
+        if final_eval_reward in (None, "") and log:
+            final_eval_reward = log.get("final_eval_reward", "")
         rows.append(
             {
                 "algorithm": info["label"],
                 "family": info["family"],
                 "env": info["env"],
                 "script": info["script"],
+                "source": source,
                 "latest_result_dir": ""
                 if latest_run is None
                 else str(latest_run.relative_to(REPO_ROOT)),
                 "has_training_curve": bool(latest_run and (latest_run / "training_curve.png").exists()),
                 "has_gif": bool(latest_run and list(latest_run.glob("*.gif"))),
                 "log_path": "" if not log else str(log["log_path"].relative_to(REPO_ROOT)),
-                "last_logged_frame": "" if not log else log.get("last_frame", ""),
-                "total_frames": "" if not log else log.get("total_frames", ""),
+                "last_logged_frame": last_logged_frame,
+                "total_frames": total_frames,
                 "last_logged_update": "" if not log else log.get("last_update", ""),
                 "total_updates": "" if not log else log.get("total_updates", ""),
                 "replay_size": "" if not log else log.get("replay_size", ""),
-                "final_avg_reward_last_20": "" if not log else log.get("final_avg_reward_last_20", ""),
+                "final_avg_reward_last_20": "" if final_avg_reward_last_20 is None else final_avg_reward_last_20,
                 "final_collect_reward_sum": "" if not log else log.get("final_collect_reward_sum", ""),
-                "final_eval_reward": "" if not log else log.get("final_eval_reward", ""),
+                "final_eval_reward": "" if final_eval_reward is None else final_eval_reward,
                 "failed": "" if not log else int(bool(log.get("failed"))),
             }
         )
     return rows
 
 
-def write_baseline_summary(output_dir: Path) -> Path:
+def write_baseline_summary(output_dir: Path, min_steps: int) -> Path:
     path = output_dir / "baseline_availability.csv"
-    rows = baseline_rows()
+    rows = baseline_rows(min_steps)
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
         writer.writeheader()
@@ -625,8 +697,8 @@ def write_markdown_report(runs: list[AmiRun], output_dir: Path, plots: PlotOutpu
             "",
             "## Breakout Baseline Availability",
             "",
-            "| Family | Algorithm | Result dir | Frame/update progress | Last-20 reward | Collect reward sum | Eval reward | Failed |",
-            "|---|---|---|---:|---:|---:|---:|---:|",
+            "| Family | Algorithm | Source | Result dir | Frame/update progress | Last-20 reward | Collect reward sum | Eval reward | Failed |",
+            "|---|---|---|---|---:|---:|---:|---:|---:|",
         ]
     )
     for row in baseline:
@@ -634,7 +706,7 @@ def write_markdown_report(runs: list[AmiRun], output_dir: Path, plots: PlotOutpu
         progress_total = row["total_frames"] or row["total_updates"]
         progress_text = progress if not progress_total else f"{progress}/{progress_total}"
         lines.append(
-            "| {family} | {algorithm} | {latest_result_dir} | {progress} | "
+            "| {family} | {algorithm} | {source} | {latest_result_dir} | {progress} | "
             "{final_avg_reward_last_20} | {final_collect_reward_sum} | "
             "{final_eval_reward} | {failed} |".format(**row, progress=progress_text)
         )
@@ -690,7 +762,7 @@ def main() -> int:
     runs = load_ami_runs(args.env, args.total_steps, args.include_incomplete)
     run_table = write_ami_run_table(runs, args.output_dir)
     summary = write_ami_summary(runs, args.output_dir)
-    baseline = write_baseline_summary(args.output_dir)
+    baseline = write_baseline_summary(args.output_dir, args.baseline_min_steps)
     out_of_scope = write_out_of_scope_model_based(args.output_dir)
     plots = write_plots(runs, args.output_dir)
     report = write_markdown_report(runs, args.output_dir, plots)
