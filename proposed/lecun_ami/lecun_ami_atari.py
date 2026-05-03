@@ -28,8 +28,10 @@ control and to compare robustness/compute trade-offs against DQN-style baselines
 import argparse
 import csv
 import datetime
+import json
 import os
 import random
+import time
 from collections import deque
 
 import ale_py
@@ -87,6 +89,60 @@ class AtariReplayBuffer:
             torch.tensor(rewards, dtype=torch.float32, device=device).unsqueeze(1),
             torch.tensor(np.stack(next_states), dtype=torch.float32, device=device) / 255.0,
             torch.tensor(dones, dtype=torch.float32, device=device).unsqueeze(1),
+        )
+
+    def sample_n_step(self, batch_size, n_step, gamma):
+        """
+        Sample n-step critic targets from contiguous replay segments.
+
+        The world model still learns one-step latent transitions, but the critic
+        gets a less sparse target by accumulating several clipped rewards before
+        bootstrapping. Episode boundaries stop the accumulation early.
+        """
+        n_step = max(1, int(n_step))
+        states = []
+        actions = []
+        cost_targets = []
+        bootstrap_states = []
+        dones = []
+        bootstrap_discounts = []
+        max_start = max(1, len(self.buffer) - n_step + 1)
+
+        for _ in range(batch_size):
+            start = random.randrange(max_start)
+            first = self.buffer[start]
+            total_cost = 0.0
+            discount = 1.0
+            done = 0.0
+            bootstrap_state = first[3]
+
+            for offset in range(n_step):
+                index = start + offset
+                if index >= len(self.buffer):
+                    break
+                transition = self.buffer[index]
+                total_cost += discount * (-transition[2])
+                bootstrap_state = transition[3]
+                done = transition[4]
+                if done:
+                    discount = 0.0
+                    break
+                discount *= gamma
+
+            states.append(first[0])
+            actions.append(first[1])
+            cost_targets.append(total_cost)
+            bootstrap_states.append(bootstrap_state)
+            dones.append(done)
+            bootstrap_discounts.append(discount)
+
+        return (
+            torch.tensor(np.stack(states), dtype=torch.float32, device=device) / 255.0,
+            torch.tensor(actions, dtype=torch.long, device=device),
+            torch.tensor(cost_targets, dtype=torch.float32, device=device).unsqueeze(1),
+            torch.tensor(np.stack(bootstrap_states), dtype=torch.float32, device=device) / 255.0,
+            torch.tensor(dones, dtype=torch.float32, device=device).unsqueeze(1),
+            torch.tensor(bootstrap_discounts, dtype=torch.float32, device=device).unsqueeze(1),
         )
 
     def sample_planner_demos(self, batch_size):
@@ -229,11 +285,16 @@ def make_atari_env(env_name, render_mode=None, terminal_on_life_loss=True):
     return env
 
 
+def update_target_network(source, target, tau):
+    """EMA update for target networks used as stable bootstrap references."""
+    with torch.no_grad():
+        for online_param, target_param in zip(source.parameters(), target.parameters()):
+            target_param.data.mul_(tau).add_(online_param.data, alpha=1.0 - tau)
+
+
 def update_target_encoder(encoder, target_encoder, tau):
     """EMA update for the stop-gradient target encoder."""
-    with torch.no_grad():
-        for online, target in zip(encoder.parameters(), target_encoder.parameters()):
-            target.data.mul_(tau).add_(online.data, alpha=1.0 - tau)
+    update_target_network(encoder, target_encoder, tau)
 
 
 def latent_variance_loss(latent):
@@ -268,6 +329,10 @@ class AtariAMIAgent:
         ])
         self.cost_model = DiscreteCostModel(args.latent_dim, action_dim, args.action_embed_dim, args.hidden_dim).to(device)
         self.critic = Critic(args.latent_dim, args.hidden_dim).to(device)
+        self.target_critic = Critic(args.latent_dim, args.hidden_dim).to(device)
+        self.target_critic.load_state_dict(self.critic.state_dict())
+        for param in self.target_critic.parameters():
+            param.requires_grad_(False)
         self.actor = DiscreteActor(args.latent_dim, action_dim, args.hidden_dim).to(device)
 
         self.model_optimizer = optim.Adam(
@@ -309,7 +374,13 @@ class AtariAMIAgent:
     def should_plan(self, state, global_step, evaluate=False):
         """Decide whether to invoke latent-space planning."""
         if evaluate:
-            return self.args.eval_mode in ("planner", "adaptive")
+            if self.args.eval_mode == "planner":
+                return True
+            if self.args.eval_mode == "actor":
+                return False
+            if self.args.planning_interval > 0 and global_step % self.args.planning_interval == 0:
+                return True
+            return self.one_step_uncertainty(state) >= self.args.uncertainty_threshold
         if self.args.planning_mode == "always":
             return True
         if self.args.planning_mode == "actor":
@@ -420,10 +491,23 @@ class AtariAMIAgent:
         world_loss = world_loss / len(self.world_models)
 
         cost_loss = F.mse_loss(self.cost_model(latent, actions), cost_targets)
-        value = self.critic(latent)
+        (
+            critic_states,
+            _,
+            critic_cost_targets,
+            critic_bootstrap_states,
+            critic_dones,
+            critic_bootstrap_discounts,
+        ) = replay.sample_n_step(self.args.batch_size, self.args.critic_n_step, self.args.gamma)
+        critic_latent = self.encoder(critic_states)
+        value = self.critic(critic_latent)
         with torch.no_grad():
-            next_value = self.critic(target_next_latent)
-            critic_target = cost_targets + self.args.gamma * (1.0 - dones) * next_value
+            target_bootstrap_latent = self.target_encoder(critic_bootstrap_states)
+            next_value = self.target_critic(target_bootstrap_latent)
+            critic_target = (
+                critic_cost_targets
+                + critic_bootstrap_discounts * (1.0 - critic_dones) * next_value
+            )
         critic_loss = F.mse_loss(value, critic_target)
         repr_loss = latent_variance_loss(latent)
 
@@ -444,6 +528,7 @@ class AtariAMIAgent:
         )
         self.model_optimizer.step()
         update_target_encoder(self.encoder, self.target_encoder, self.args.target_tau)
+        update_target_network(self.critic, self.target_critic, self.args.critic_target_tau)
 
         actor_loss_value = 0.0
         demo_batch = replay.sample_planner_demos(self.args.batch_size)
@@ -467,6 +552,7 @@ class AtariAMIAgent:
             "critic_loss": float(critic_loss.item()),
             "repr_loss": float(repr_loss.item()),
             "actor_loss": float(actor_loss_value),
+            "critic_n_step": float(self.args.critic_n_step),
         }
 
 
@@ -498,7 +584,142 @@ def epsilon_by_step(step, args):
     return args.epsilon_start + frac * (args.epsilon_end - args.epsilon_start)
 
 
-def train(args):
+def mean_or_zero(values):
+    return float(np.mean(values)) if values else 0.0
+
+
+def write_config(args, save_dir):
+    config_path = os.path.join(save_dir, "config.json")
+    payload = {
+        "config": vars(args),
+        "device": str(device),
+        "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
+    }
+    with open(config_path, "w") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+    print(f"Config saved: {config_path}")
+
+
+def save_checkpoint(agent, args, save_dir, filename, global_step=None):
+    checkpoint_path = os.path.join(save_dir, filename)
+    torch.save({
+        "global_step": global_step,
+        "encoder": agent.encoder.state_dict(),
+        "target_encoder": agent.target_encoder.state_dict(),
+        "world_models": [model.state_dict() for model in agent.world_models],
+        "cost_model": agent.cost_model.state_dict(),
+        "critic": agent.critic.state_dict(),
+        "target_critic": agent.target_critic.state_dict(),
+        "actor": agent.actor.state_dict(),
+        "model_optimizer": agent.model_optimizer.state_dict(),
+        "actor_optimizer": agent.actor_optimizer.state_dict(),
+        "config": vars(args),
+        "action_dim": agent.action_dim,
+    }, checkpoint_path)
+    print(f"Checkpoint saved: {checkpoint_path}")
+
+
+def get_fire_action(env):
+    try:
+        meanings = env.unwrapped.get_action_meanings()
+    except Exception:
+        return None
+    return meanings.index("FIRE") if "FIRE" in meanings else None
+
+
+def get_lives(env):
+    try:
+        return env.unwrapped.ale.lives()
+    except Exception:
+        return None
+
+
+def evaluate_policy(agent, args, global_step, record_gif=False, save_dir=None):
+    render_mode = "rgb_array" if record_gif else None
+    env = make_atari_env(args.env, render_mode=render_mode, terminal_on_life_loss=False)
+    rewards = []
+    steps_per_episode = []
+    planning_rates = []
+    frames = []
+    fire_action = get_fire_action(env)
+
+    for episode in range(args.eval_episodes):
+        state, _ = env.reset(seed=args.seed + 100000 + global_step + episode)
+        done = False
+        total_reward = 0.0
+        steps = 0
+        planned_steps = 0
+        lives = get_lives(env)
+
+        if fire_action is not None and steps < args.eval_max_steps:
+            state, reward, terminated, truncated, _ = env.step(fire_action)
+            done = terminated or truncated
+            total_reward += reward
+            steps += 1
+            if record_gif:
+                frames.append(env.render())
+
+        while not done and steps < args.eval_max_steps:
+            if record_gif:
+                frames.append(env.render())
+            action, planned, _ = select_action(
+                agent,
+                state,
+                global_step + steps,
+                epsilon=0.0,
+                evaluate=True,
+            )
+            state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_reward += reward
+            planned_steps += int(planned)
+            steps += 1
+
+            new_lives = get_lives(env)
+            if (
+                fire_action is not None
+                and lives is not None
+                and new_lives is not None
+                and new_lives < lives
+                and not done
+                and steps < args.eval_max_steps
+            ):
+                lives = new_lives
+                state, reward, terminated, truncated, _ = env.step(fire_action)
+                done = terminated or truncated
+                total_reward += reward
+                steps += 1
+                if record_gif:
+                    frames.append(env.render())
+
+        rewards.append(total_reward)
+        steps_per_episode.append(steps)
+        planning_rates.append(planned_steps / max(1, steps))
+
+    env.close()
+
+    gif_path = None
+    if record_gif and frames and save_dir is not None:
+        import imageio
+
+        gif_path = os.path.join(save_dir, "lecun_ami_atari_agent.gif")
+        imageio.mimsave(gif_path, frames, fps=30)
+        print(f"Evaluation GIF saved: {gif_path}")
+
+    return {
+        "global_step": int(global_step),
+        "eval_reward_mean": mean_or_zero(rewards),
+        "eval_reward_std": float(np.std(rewards)) if rewards else 0.0,
+        "eval_reward_min": float(np.min(rewards)) if rewards else 0.0,
+        "eval_reward_max": float(np.max(rewards)) if rewards else 0.0,
+        "eval_steps_mean": mean_or_zero(steps_per_episode),
+        "eval_planning_rate_mean": mean_or_zero(planning_rates),
+        "eval_episodes": int(args.eval_episodes),
+        "gif_path": gif_path or "",
+    }
+
+
+def train(args, save_dir):
     env = make_atari_env(args.env)
     env.action_space.seed(args.seed)
     agent = AtariAMIAgent(env.action_space.n, args)
@@ -519,45 +740,178 @@ def train(args):
     planned_steps = 0
     episode_steps = 0
 
+    metrics_path = os.path.join(save_dir, "metrics.csv")
+    training_log_path = os.path.join(save_dir, "training_log.csv")
+    eval_metrics_path = os.path.join(save_dir, "eval_metrics.csv")
+    metrics_fields = [
+        "episode",
+        "global_step",
+        "reward",
+        "planning_rate",
+        "episode_steps",
+        "epsilon",
+        "completed",
+        "elapsed_sec",
+    ]
+    training_fields = [
+        "global_step",
+        "elapsed_sec",
+        "episodes",
+        "epsilon",
+        "replay_size",
+        "avg_reward_10",
+        "avg_reward_100",
+        "avg_planning_10",
+        "avg_planning_100",
+        "avg_uncertainty",
+        "avg_predicted_cost",
+        "world_loss",
+        "cost_loss",
+        "critic_loss",
+        "repr_loss",
+        "actor_loss",
+        "critic_n_step",
+    ]
+    eval_fields = [
+        "global_step",
+        "eval_reward_mean",
+        "eval_reward_std",
+        "eval_reward_min",
+        "eval_reward_max",
+        "eval_steps_mean",
+        "eval_planning_rate_mean",
+        "eval_episodes",
+        "gif_path",
+    ]
+
+    recent_uncertainties = deque(maxlen=max(1, args.log_interval))
+    recent_predicted_costs = deque(maxlen=max(1, args.log_interval))
+    start_time = time.time()
+    episode_index = 0
+
     print("Starting Atari LeCun-AMI training loop...")
-    for global_step in range(1, args.total_steps + 1):
-        epsilon = epsilon_by_step(global_step, args)
-        action, planned, _ = select_action(agent, state, global_step, epsilon, evaluate=False)
-        next_state, reward, terminated, truncated, _ = env.step(action)
-        done = terminated or truncated
-        replay.add(state, action, reward, next_state, done, planner_action=action if planned else None)
+    with (
+        open(metrics_path, "w", newline="") as metrics_handle,
+        open(training_log_path, "w", newline="") as training_handle,
+        open(eval_metrics_path, "w", newline="") as eval_handle,
+    ):
+        metrics_writer = csv.DictWriter(metrics_handle, fieldnames=metrics_fields)
+        training_writer = csv.DictWriter(training_handle, fieldnames=training_fields)
+        eval_writer = csv.DictWriter(eval_handle, fieldnames=eval_fields)
+        metrics_writer.writeheader()
+        training_writer.writeheader()
+        eval_writer.writeheader()
 
-        episode_reward += reward
-        planned_steps += int(planned)
-        episode_steps += 1
-        state = next_state
+        for global_step in range(1, args.total_steps + 1):
+            epsilon = epsilon_by_step(global_step, args)
+            action, planned, action_info = select_action(agent, state, global_step, epsilon, evaluate=False)
+            uncertainty = action_info.get("uncertainty")
+            predicted_cost = action_info.get("predicted_cost")
+            if uncertainty is not None:
+                recent_uncertainties.append(float(uncertainty))
+            if predicted_cost is not None:
+                recent_predicted_costs.append(float(predicted_cost))
 
-        for _ in range(args.updates_per_step):
-            latest_losses = agent.update(replay)
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            replay.add(state, action, reward, next_state, done, planner_action=action if planned else None)
 
-        if done:
+            episode_reward += reward
+            planned_steps += int(planned)
+            episode_steps += 1
+            state = next_state
+
+            for _ in range(args.updates_per_step):
+                latest_losses = agent.update(replay)
+
+            if done:
+                episode_index += 1
+                planning_rate = planned_steps / max(1, episode_steps)
+                episode_rewards.append(episode_reward)
+                planning_rates.append(planning_rate)
+                elapsed = time.time() - start_time
+                metrics_writer.writerow({
+                    "episode": episode_index,
+                    "global_step": global_step,
+                    "reward": episode_reward,
+                    "planning_rate": planning_rate,
+                    "episode_steps": episode_steps,
+                    "epsilon": epsilon,
+                    "completed": 1,
+                    "elapsed_sec": elapsed,
+                })
+                metrics_handle.flush()
+                state, _ = env.reset()
+                episode_reward = 0.0
+                planned_steps = 0
+                episode_steps = 0
+
+            if global_step % args.log_interval == 0:
+                elapsed = time.time() - start_time
+                avg_reward_10 = mean_or_zero(episode_rewards[-10:])
+                avg_reward_100 = mean_or_zero(episode_rewards[-100:])
+                avg_plan_10 = mean_or_zero(planning_rates[-10:])
+                avg_plan_100 = mean_or_zero(planning_rates[-100:])
+                training_writer.writerow({
+                    "global_step": global_step,
+                    "elapsed_sec": elapsed,
+                    "episodes": len(episode_rewards),
+                    "epsilon": epsilon,
+                    "replay_size": len(replay),
+                    "avg_reward_10": avg_reward_10,
+                    "avg_reward_100": avg_reward_100,
+                    "avg_planning_10": avg_plan_10,
+                    "avg_planning_100": avg_plan_100,
+                    "avg_uncertainty": mean_or_zero(recent_uncertainties),
+                    "avg_predicted_cost": mean_or_zero(recent_predicted_costs),
+                    "world_loss": latest_losses.get("world_loss", 0.0),
+                    "cost_loss": latest_losses.get("cost_loss", 0.0),
+                    "critic_loss": latest_losses.get("critic_loss", 0.0),
+                    "repr_loss": latest_losses.get("repr_loss", 0.0),
+                    "actor_loss": latest_losses.get("actor_loss", 0.0),
+                    "critic_n_step": latest_losses.get("critic_n_step", args.critic_n_step),
+                })
+                training_handle.flush()
+                print(
+                    f"Step {global_step}/{args.total_steps} | "
+                    f"Epsilon: {epsilon:.3f} | "
+                    f"Avg reward (10/100): {avg_reward_10:.2f}/{avg_reward_100:.2f} | "
+                    f"Planning rate (10/100): {avg_plan_10:.2f}/{avg_plan_100:.2f} | "
+                    f"World loss: {latest_losses.get('world_loss', 0.0):.4f} | "
+                    f"Critic loss: {latest_losses.get('critic_loss', 0.0):.4f} | "
+                    f"Actor loss: {latest_losses.get('actor_loss', 0.0):.4f}"
+                )
+
+            if args.eval_interval > 0 and global_step % args.eval_interval == 0:
+                eval_stats = evaluate_policy(agent, args, global_step, record_gif=False)
+                eval_writer.writerow(eval_stats)
+                eval_handle.flush()
+                print(
+                    f"Eval at step {global_step}: "
+                    f"mean={eval_stats['eval_reward_mean']:.2f}, "
+                    f"max={eval_stats['eval_reward_max']:.2f}, "
+                    f"planning={eval_stats['eval_planning_rate_mean']:.2f}"
+                )
+
+            if args.checkpoint_interval > 0 and global_step % args.checkpoint_interval == 0:
+                save_checkpoint(agent, args, save_dir, f"checkpoint_step_{global_step}.pth", global_step)
+
+        if episode_steps > 0:
+            episode_index += 1
+            planning_rate = planned_steps / max(1, episode_steps)
             episode_rewards.append(episode_reward)
-            planning_rates.append(planned_steps / max(1, episode_steps))
-            state, _ = env.reset()
-            episode_reward = 0.0
-            planned_steps = 0
-            episode_steps = 0
-
-        if global_step % args.log_interval == 0:
-            avg_reward = np.mean(episode_rewards[-10:]) if episode_rewards else 0.0
-            avg_plan = np.mean(planning_rates[-10:]) if planning_rates else 0.0
-            print(
-                f"Step {global_step}/{args.total_steps} | "
-                f"Epsilon: {epsilon:.3f} | "
-                f"Avg reward (last 10): {avg_reward:.2f} | "
-                f"Planning rate: {avg_plan:.2f} | "
-                f"World loss: {latest_losses.get('world_loss', 0.0):.4f} | "
-                f"Actor loss: {latest_losses.get('actor_loss', 0.0):.4f}"
-            )
-
-    if episode_steps > 0:
-        episode_rewards.append(episode_reward)
-        planning_rates.append(planned_steps / max(1, episode_steps))
+            planning_rates.append(planning_rate)
+            metrics_writer.writerow({
+                "episode": episode_index,
+                "global_step": args.total_steps,
+                "reward": episode_reward,
+                "planning_rate": planning_rate,
+                "episode_steps": episode_steps,
+                "epsilon": epsilon_by_step(args.total_steps, args),
+                "completed": 0,
+                "elapsed_sec": time.time() - start_time,
+            })
+            metrics_handle.flush()
 
     env.close()
     return agent, episode_rewards, planning_rates
@@ -565,12 +919,15 @@ def train(args):
 
 def save_metrics(rewards, planning_rates, save_dir, env_name, no_plots=False):
     metrics_path = os.path.join(save_dir, "metrics.csv")
-    with open(metrics_path, "w", newline="") as handle:
-        writer = csv.writer(handle)
-        writer.writerow(["episode", "reward", "planning_rate"])
-        for index, (reward, planning_rate) in enumerate(zip(rewards, planning_rates), start=1):
-            writer.writerow([index, reward, planning_rate])
-    print(f"Metrics saved: {metrics_path}")
+    if os.path.exists(metrics_path):
+        print(f"Episode metrics saved during training: {metrics_path}")
+    else:
+        with open(metrics_path, "w", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["episode", "reward", "planning_rate"])
+            for index, (reward, planning_rate) in enumerate(zip(rewards, planning_rates), start=1):
+                writer.writerow([index, reward, planning_rate])
+        print(f"Metrics saved: {metrics_path}")
     if no_plots:
         return
 
@@ -609,34 +966,30 @@ def save_metrics(rewards, planning_rates, save_dir, env_name, no_plots=False):
 
 
 def evaluate_and_record(agent, args, save_dir):
-    if args.no_gif:
-        return
+    eval_stats = evaluate_policy(
+        agent,
+        args,
+        args.total_steps,
+        record_gif=not args.no_gif,
+        save_dir=save_dir,
+    )
+    final_eval_path = os.path.join(save_dir, "final_eval_metrics.json")
+    with open(final_eval_path, "w") as handle:
+        json.dump(eval_stats, handle, indent=2, sort_keys=True)
 
-    import imageio
+    eval_metrics_path = os.path.join(save_dir, "eval_metrics.csv")
+    write_header = not os.path.exists(eval_metrics_path) or os.path.getsize(eval_metrics_path) == 0
+    with open(eval_metrics_path, "a", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(eval_stats.keys()))
+        if write_header:
+            writer.writeheader()
+        writer.writerow(eval_stats)
 
-    env = make_atari_env(args.env, render_mode="rgb_array", terminal_on_life_loss=False)
-    frames = []
-    rewards = []
-
-    for episode in range(args.eval_episodes):
-        state, _ = env.reset(seed=args.seed + 1000 + episode)
-        done = False
-        total_reward = 0.0
-        steps = 0
-        while not done and steps < args.eval_max_steps:
-            frames.append(env.render())
-            action, _, _ = select_action(agent, state, steps, epsilon=0.0, evaluate=True)
-            state, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            total_reward += reward
-            steps += 1
-        rewards.append(total_reward)
-
-    env.close()
-    gif_path = os.path.join(save_dir, "lecun_ami_atari_agent.gif")
-    imageio.mimsave(gif_path, frames, fps=30)
-    print(f"Evaluation reward mean over {args.eval_episodes}: {np.mean(rewards):.2f}")
-    print(f"Evaluation GIF saved: {gif_path}")
+    print(
+        f"Final full-game evaluation mean over {args.eval_episodes}: "
+        f"{eval_stats['eval_reward_mean']:.2f}"
+    )
+    print(f"Final evaluation metrics saved: {final_eval_path}")
 
 
 def build_args():
@@ -671,16 +1024,21 @@ def build_args():
     parser.add_argument("--model-lr", type=float, default=1e-4)
     parser.add_argument("--actor-lr", type=float, default=1e-4)
     parser.add_argument("--target-tau", type=float, default=0.995)
+    parser.add_argument("--critic-target-tau", type=float, default=0.995)
+    parser.add_argument("--critic-n-step", type=int, default=5)
     parser.add_argument("--cost-loss-coef", type=float, default=1.0)
     parser.add_argument("--critic-loss-coef", type=float, default=0.5)
     parser.add_argument("--repr-loss-coef", type=float, default=0.05)
     parser.add_argument("--max-grad-norm", type=float, default=10.0)
     parser.add_argument("--eval-episodes", type=int, default=1)
     parser.add_argument("--eval-max-steps", type=int, default=2000)
+    parser.add_argument("--eval-interval", type=int, default=50000)
+    parser.add_argument("--checkpoint-interval", type=int, default=100000)
     parser.add_argument("--log-interval", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--no-plots", action="store_true")
     parser.add_argument("--no-gif", action="store_true")
+    parser.add_argument("--no-final-eval", action="store_true")
     return parser.parse_args()
 
 
@@ -696,18 +1054,23 @@ if __name__ == "__main__":
     os.makedirs(save_dir, exist_ok=True)
     print(f"Saving all results to: {save_dir}")
 
-    trained_agent, rewards, planning_rates = train(args)
-    model_path = os.path.join(save_dir, "model.pth")
-    torch.save({
-        "encoder": trained_agent.encoder.state_dict(),
-        "target_encoder": trained_agent.target_encoder.state_dict(),
-        "world_models": [model.state_dict() for model in trained_agent.world_models],
-        "cost_model": trained_agent.cost_model.state_dict(),
-        "critic": trained_agent.critic.state_dict(),
-        "actor": trained_agent.actor.state_dict(),
-        "config": vars(args),
-    }, model_path)
-    print(f"Model saved: {model_path}")
+    write_config(args, save_dir)
+    trained_agent, rewards, planning_rates = train(args, save_dir)
+    save_checkpoint(trained_agent, args, save_dir, "model.pth", args.total_steps)
+
+    summary_path = os.path.join(save_dir, "final_summary.json")
+    with open(summary_path, "w") as handle:
+        json.dump({
+            "episodes": len(rewards),
+            "reward_mean": mean_or_zero(rewards),
+            "reward_last_100_mean": mean_or_zero(rewards[-100:]),
+            "reward_max": float(np.max(rewards)) if rewards else 0.0,
+            "planning_rate_mean": mean_or_zero(planning_rates),
+            "planning_rate_last_100_mean": mean_or_zero(planning_rates[-100:]),
+            "total_steps": args.total_steps,
+        }, handle, indent=2, sort_keys=True)
+    print(f"Final summary saved: {summary_path}")
 
     save_metrics(rewards, planning_rates, save_dir, args.env, no_plots=args.no_plots)
-    evaluate_and_record(trained_agent, args, save_dir)
+    if not args.no_final_eval:
+        evaluate_and_record(trained_agent, args, save_dir)

@@ -57,12 +57,19 @@ A more useful comparison run is:
 ```bash
 python proposed/lecun_ami/lecun_ami_atari.py \
   --env ALE/Breakout-v5 \
-  --total-steps 100000 \
-  --seed-steps 5000 \
-  --initial-updates 1000 \
+  --total-steps 500000 \
+  --seed-steps 10000 \
+  --initial-updates 2000 \
   --batch-size 32 \
-  --num-sequences 256 \
-  --horizon 8
+  --planning-interval 4 \
+  --uncertainty-threshold 0.001 \
+  --num-sequences 512 \
+  --horizon 12 \
+  --critic-n-step 5 \
+  --eval-mode adaptive \
+  --eval-interval 50000 \
+  --eval-episodes 5 \
+  --checkpoint-interval 100000
 ```
 
 Run this separately from `run_all_algorithms.py`; Atari planning is expensive
@@ -109,6 +116,16 @@ results/lecun_ami_atari/run_<timestamp>/
 with a model checkpoint, `metrics.csv`, optional training plots, and an optional
 Atari rollout GIF.
 
+The Atari script also writes research-oriented experiment files:
+
+- `config.json`: exact command configuration and device,
+- `training_log.csv`: losses, epsilon, replay size, uncertainty, and rolling rewards,
+- `eval_metrics.csv`: periodic full-game evaluation with `terminal_on_life_loss=False`,
+- `final_eval_metrics.json`: final full-game evaluation summary,
+- `final_summary.json`: compact training summary,
+- `checkpoint_step_<step>.pth`: periodic checkpoints when `--checkpoint-interval > 0`,
+- `model.pth`: final checkpoint.
+
 ## Important Controls
 
 - `--planning-mode adaptive`: configurator chooses planner or actor.
@@ -124,3 +141,8 @@ For Atari, the important additional controls are:
 - `--horizon`: latent rollout length for each candidate sequence.
 - `--actor-seed-frac`: fraction of sequences sampled near the actor policy.
 - `--sequence-mutation-prob`: random mutations applied to actor-seeded plans.
+- `--critic-n-step`: n-step cost target for the critic; useful for sparse rewards.
+- `--critic-target-tau`: EMA rate for the target critic.
+- `--eval-interval`: periodic full-game evaluation interval in agent steps.
+- `--checkpoint-interval`: periodic checkpoint interval in agent steps.
+- `--no-final-eval`: skip the final full-game evaluation for smoke tests.

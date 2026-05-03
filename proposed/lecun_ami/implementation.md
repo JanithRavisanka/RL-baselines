@@ -70,6 +70,12 @@ V(z_t) ~= expected future cost
 
 The planner uses this as a terminal value after the finite CEM rollout horizon.
 
+The Atari extension adds two stabilizers:
+
+- a target critic updated by EMA, used only for bootstrap targets,
+- n-step cost targets, so sparse Breakout rewards affect more than the immediate
+  one-step transition.
+
 ## 5) Actor
 
 `Actor` is the fast reactive policy. It is trained by imitating actions selected
@@ -127,3 +133,8 @@ ALE/Breakout-v5: DQN, DDQN, PER DDQN, LeCun-AMI Atari
 Track episode reward, planning rate, wall-clock time, and GPU memory. The
 planning rate is important because this method explicitly trades extra
 deliberation for better action selection.
+
+The Atari script separates training-life metrics from benchmark-style full-game
+evaluation. Training uses life loss as an episode boundary for denser learning
+signals, while periodic evaluation runs with `terminal_on_life_loss=False` and
+writes the results to `eval_metrics.csv`.
