@@ -13,6 +13,19 @@ prototype that maps the proposal to implementable modules:
 - actor,
 - configurator-controlled planner.
 
+For a more detailed practical explanation of how these pieces work together,
+see [`PRACTICAL_EXPLANATION.md`](PRACTICAL_EXPLANATION.md).
+
+Research extension notes:
+
+- [`CONFIGURATOR_RESEARCH.md`](CONFIGURATOR_RESEARCH.md): practical design for
+  making the configurator more advanced and compute-aware.
+- [`ENERGY_BASED_LEARNING_FOR_AMI.md`](ENERGY_BASED_LEARNING_FOR_AMI.md):
+  energy-based learning intuition and how to use it for the configurator and
+  planner.
+- [`CONFIGURATOR_EXPERIMENT_PLAN.md`](CONFIGURATOR_EXPERIMENT_PLAN.md):
+  staged experiments and metrics for learned configurator ablations.
+
 ## Run
 
 From the repository root:
